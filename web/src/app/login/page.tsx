@@ -28,7 +28,7 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            const response = await fetch("http://localhost:4000/login", {
+            const response = await fetch("http://localhost:4000/api/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -45,7 +45,7 @@ export default function LoginPage() {
 
             if (data.kind === "coach") {
                 router.push("/coach/dashboard");
-            } else if (data.kind === "administrator") {
+            } else if (data.kind === "admin") {
                 router.push("/admin/dashboard");
             } else {
                 router.push("/participant/dashboard");
