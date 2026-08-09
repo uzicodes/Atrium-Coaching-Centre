@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, withTransaction } from '../db';
 import { requireSession } from '../auth';
 import { hoursOfNotice, refundAmount, refundPercent, roomFee, seatFee } from '../credits';
+import { sendEmail } from '../email';
 
 const router = Router();
 
@@ -172,6 +173,15 @@ router.post('/', requireSession, async (req, res) => {
       return inserted.rows[0];
     });
 
+    const admins = await query("select email from person where kind = 'admin'");
+    for (const admin of admins) {
+      await sendEmail({
+        to: admin.email,
+        subject: 'New Session Booked',
+        text: `A new ${session_type} session was scheduled in room ${room_id} starting at ${new Date(starts_at).toLocaleString()}.`
+      });
+    }
+
     res.status(201).json(created);
   } catch (err: any) {
     console.error(err);
@@ -253,7 +263,7 @@ router.post('/:id/cancel', requireSession, async (req, res) => {
 
     const summary = await withTransaction(async (client) => {
       const enrolments = await client.query(
-        "select id, person_id, credits_charged from enrolment where session_id = $1 and status = 'active'",
+        "select e.id, e.person_id, e.credits_charged, p.email from enrolment e join person p on p.id = e.person_id where e.session_id = $1 and e.status = 'active'",
         [id]
       );
 
@@ -284,8 +294,25 @@ router.post('/:id/cancel', requireSession, async (req, res) => {
 
       await client.query("update session set status = 'cancelled' where id = $1", [id]);
 
-      return { enrolments: enrolments.rowCount, seatsRefunded };
+      return { enrolments: enrolments.rowCount, seatsRefunded, emails: enrolments.rows.map((r: any) => r.email) };
     });
+
+    const admins = await query("select email from person where kind = 'admin'");
+    for (const admin of admins) {
+      await sendEmail({
+        to: admin.email,
+        subject: 'Session Cancelled',
+        text: `Session ${id} has been cancelled by the coach.`
+      });
+    }
+
+    for (const email of summary.emails) {
+      await sendEmail({
+        to: email,
+        subject: 'Session Cancelled',
+        text: `The session ${id} you were enrolled in has been cancelled. Your credits have been refunded.`
+      });
+    }
 
     res.json({
       id,
@@ -350,10 +377,28 @@ router.post('/:id/book', requireSession, async (req, res) => {
         [id, personId, seatFeeVal]
       );
 
-      return inserted.rows[0];
+      const hostCoach = await client.query("select email from person where id = $1", [session.coach_id]);
+      const participantPerson = await client.query("select email from person where id = $1", [personId]);
+
+      return { enrolment: inserted.rows[0], hostEmail: hostCoach.rows[0]?.email, participantEmail: participantPerson.rows[0]?.email };
     });
 
-    res.status(201).json(result);
+    if (result.hostEmail) {
+      await sendEmail({
+        to: result.hostEmail,
+        subject: 'New Booking',
+        text: `A new participant has booked your session ${id}.`
+      });
+    }
+    if (result.participantEmail) {
+      await sendEmail({
+        to: result.participantEmail,
+        subject: 'Booking Confirmation',
+        text: `Your booking for session ${id} is confirmed.`
+      });
+    }
+
+    res.status(201).json(result.enrolment);
   } catch (err: any) {
     console.error(err);
     if (err.message === 'NOT_FOUND') return res.status(404).json({ error: 'no such session' });
