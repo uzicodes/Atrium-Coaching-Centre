@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -10,4 +5,74 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model check_in {
+  id            Int       @id @default(autoincrement())
+  enrolment_id  Int
+  checked_in_at DateTime  @default(now()) @db.Timestamptz(6)
+  
+  enrolment     enrolment @relation(fields: [enrolment_id], references: [id], onDelete: Cascade)
+}
+
+model enrolment {
+  id               Int       @id @default(autoincrement())
+  session_id       Int
+  person_id        Int
+  status           String    @default("active")
+  credits_charged  Int
+  credits_refunded Int       @default(0)
+  enrolled_at      DateTime  @default(now()) @db.Timestamptz(6)
+  cancelled_at     DateTime? @db.Timestamptz(6)
+  
+  check_in         check_in[]
+  person           person    @relation(fields: [person_id], references: [id], onDelete: Cascade)
+  session          session   @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  // Prevent a single person from booking multiple seats in the same session
+  @@unique([person_id, session_id])
+}
+
+model person {
+  id            Int         @id @default(autoincrement())
+  email         String      @unique
+  password_hash String
+  full_name     String
+  kind          String      // "participant", "coach", or "administrator"
+  credits       Int         @default(0) 
+  active        Boolean     @default(true)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  
+  enrolment     enrolment[]
+  session       session[]
+}
+
+model room {
+  id       Int       @id @default(autoincrement())
+  name     String
+  capacity Int
+  
+  session  session[]
+}
+
+model session {
+  id               Int         @id @default(autoincrement())
+  room_id          Int
+  coach_id         Int
+  discipline       String
+  session_type     String
+  status           String      @default("scheduled")
+  starts_at        DateTime    @db.Timestamptz(6)
+  ends_at          DateTime    @db.Timestamptz(6)
+  room_fee_credits Int
+  seat_fee_credits Int
+  created_at       DateTime    @default(now()) @db.Timestamptz(6)
+  
+  enrolment        enrolment[]
+  person           person      @relation(fields: [coach_id], references: [id], onDelete: Restrict)
+  room             room        @relation(fields: [room_id], references: [id], onDelete: Restrict)
+
+  // Highly efficient index for calendar queries checking room availability and schedule
+  @@index([starts_at, ends_at, room_id])
 }
