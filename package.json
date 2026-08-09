@@ -14,10 +14,12 @@
     "test": "npm --workspace api run test"
   },
   "dependencies": {
+    "nodemailer": "^9.0.5",
     "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^8.0.1",
     "prisma": "^7.9.1",
     "typescript": "^5.7.2"
   },
