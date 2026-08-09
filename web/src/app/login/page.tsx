@@ -9,8 +9,8 @@ const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600
 
 export default function LoginPage() {
     const router = useRouter();
-    const [email, setEmail] = useState("halle.ostrowski@atrium.local");
-    const [password, setPassword] = useState("password");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -37,8 +37,12 @@ export default function LoginPage() {
             // Redirect based on user kind
             if (data.kind === "coach") {
                 router.push("/coach/dashboard");
+            } else if (data.kind === "admin") {
+                router.push("/admin/dashboard");
+            } else if (data.kind === "participant") {
+                router.push("/participant/dashboard");
             } else {
-                router.push("/dashboard");
+                router.push("/");
             }
         } catch (err: any) {
             setError(err.message || "Failed to connect to authentication server.");
