@@ -21,42 +21,36 @@ router.get('/', async (req, res) => {
     const to = typeof req.query.to === 'string' && req.query.to ? req.query.to : null;
 
     const params: unknown[] = [from];
-    let sql = `select id, room_id, coach_id, discipline, session_type, status,
-                      starts_at, ends_at, room_fee_credits, seat_fee_credits
-                 from session
-                where starts_at >= $1
-                  and status <> 'cancelled'`;
+    let sql = `select s.id, s.room_id, s.coach_id, s.discipline, s.session_type, s.status,
+                      s.starts_at, s.ends_at, s.room_fee_credits, s.seat_fee_credits,
+                      r.name  as room_name,
+                      r.capacity as room_capacity,
+                      p.full_name as coach_name,
+                      coalesce(e.cnt, 0) as enrolled_count
+                 from session s
+                 left join room r on r.id = s.room_id
+                 left join person p on p.id = s.coach_id
+                 left join lateral (
+                   select count(*)::int as cnt
+                     from enrolment
+                    where session_id = s.id and status = 'active'
+                 ) e on true
+                where s.starts_at >= $1
+                  and s.status <> 'cancelled'`;
 
     if (to) {
       params.push(to);
-      sql += ` and starts_at < $${params.length}`;
+      sql += ` and s.starts_at < $${params.length}`;
     }
 
-    sql += ' order by starts_at';
+    sql += ' order by s.starts_at';
 
-    const sessions = await query(sql, params);
-    const feed = [];
+    const rows = await query(sql, params);
 
-    for (const session of sessions) {
-      const rooms = await query('select id, name, capacity from room where id = $1', [session.room_id]);
-      const coaches = await query('select id, full_name from person where id = $1', [session.coach_id]);
-      const enrolled = await query(
-        "select count(*)::int as count from enrolment where session_id = $1 and status = 'active'",
-        [session.id]
-      );
-
-      const capacity = rooms.length > 0 ? rooms[0].capacity : 0;
-      const taken = enrolled[0].count;
-
-      feed.push({
-        ...session,
-        room_name: rooms.length > 0 ? rooms[0].name : null,
-        room_capacity: capacity,
-        coach_name: coaches.length > 0 ? coaches[0].full_name : null,
-        enrolled_count: taken,
-        places_remaining: capacity - taken
-      });
-    }
+    const feed = rows.map((row: any) => ({
+      ...row,
+      places_remaining: (row.room_capacity ?? 0) - (row.enrolled_count ?? 0)
+    }));
 
     res.json(feed);
   } catch (err) {

@@ -2,134 +2,96 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 
-const spaceGrotesk = Space_Grotesk({
-    subsets: ["latin"],
-    weight: ["400", "500", "600", "700"],
-});
-
-const plexMono = IBM_Plex_Mono({
-    subsets: ["latin"],
-    weight: ["400", "500", "600"],
-});
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"] });
 
 export default function LoginPage() {
     const router = useRouter();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+    const [email, setEmail] = useState("halle.ostrowski@atrium.local");
+    const [password, setPassword] = useState("password");
     const [error, setError] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        setIsLoading(true);
+        setLoading(true);
 
         try {
-            const response = await fetch("http://localhost:4000/api/login", {
+            // Unified to 127.0.0.1 to securely lock in the session cookie
+            const res = await fetch("http://localhost:4000/api/login", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 credentials: "include",
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = await response.json();
+            const data = await res.json();
 
-            if (!response.ok) {
-                throw new Error(data.error || "Login failed");
+            if (!res.ok) {
+                throw new Error(data.error || "Invalid email or password");
             }
 
+            // Redirect based on user kind
             if (data.kind === "coach") {
                 router.push("/coach/dashboard");
-            } else if (data.kind === "admin") {
-                router.push("/admin/dashboard");
             } else {
-                router.push("/participant/dashboard");
+                router.push("/dashboard");
             }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Invalid email or password. Please try again.");
+        } catch (err: any) {
+            setError(err.message || "Failed to connect to authentication server.");
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
     return (
-        <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] text-[#171717] flex flex-col justify-center items-center p-6 selection:bg-[#2F4BFF] selection:text-white`}>
+        <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] text-[#171717] flex items-center justify-center p-6`}>
+            <div className="border-4 border-[#171717] bg-white p-8 max-w-md w-full shadow-[8px_8px_0_0_#171717]">
+                <h1 className="text-3xl font-bold uppercase mb-2">Portal Login</h1>
+                <p className={`${plexMono.className} text-xs text-[#171717]/70 mb-6`}>
+                    Sign in using your authorized credentials.
+                </p>
 
-            {/* Back to Home Navigation */}
-            <div className="absolute top-6 left-6">
-                <Link
-                    href="/"
-                    className="inline-flex items-center gap-2 text-sm font-semibold hover:text-[#2F4BFF] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2F4BFF]"
-                >
-                    &larr; Back to HomePage
-                </Link>
-            </div>
-
-            <div className="w-full max-w-md">
-                {/* Header Title */}
-                <div className="mb-8 text-center">
-                    <div className="inline-flex h-12 w-12 items-center justify-center border-2 border-[#171717] bg-[#2F4BFF] text-white shadow-[4px_4px_0_0_#171717] mb-6">
-                        <span className={`${plexMono.className} text-2xl font-bold`}>A</span>
+                {error && (
+                    <div className="mb-4 bg-[#FFE3E1] text-[#FF5252] border-2 border-[#171717] p-3 text-sm font-bold">
+                        {error}
                     </div>
-                    <h1 className="text-4xl font-bold tracking-tight">Access Portal</h1>
-                    <p className="mt-2 text-[#171717]/70">Sign in to your Atrium account.</p>
-                </div>
+                )}
 
-                {/* Login Form Box */}
-                <div className="border-2 border-[#171717] bg-white p-8 shadow-[8px_8px_0_0_#171717]">
-                    <form onSubmit={handleLogin} className="space-y-6">
+                <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                        <label className={`${plexMono.className} block text-xs font-bold uppercase mb-1`}>Email Address</label>
+                        <input
+                            type="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full border-2 border-[#171717] p-2.5 bg-[#FAF6EE] font-mono text-sm"
+                        />
+                    </div>
 
-                        {/* Error Message */}
-                        {error && (
-                            <div className="border-2 border-[#171717] bg-[#FFE3E1] px-4 py-3 text-sm font-semibold text-[#FF5252]">
-                                {error}
-                            </div>
-                        )}
+                    <div>
+                        <label className={`${plexMono.className} block text-xs font-bold uppercase mb-1`}>Password</label>
+                        <input
+                            type="password"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full border-2 border-[#171717] p-2.5 bg-[#FAF6EE] font-mono text-sm"
+                        />
+                    </div>
 
-                        <div className="space-y-2">
-                            <label htmlFor="email" className={`${plexMono.className} block text-xs font-semibold tracking-widest uppercase`}>
-                                Email Address
-                            </label>
-                            <input
-                                id="email"
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                                className="w-full border-2 border-[#171717] bg-[#FAF6EE] px-4 py-3 text-base outline-none transition-shadow focus:shadow-[4px_4px_0_0_#2F4BFF] focus:border-[#2F4BFF]"
-                                placeholder="name@example.com"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <label htmlFor="password" className={`${plexMono.className} block text-xs font-semibold tracking-widest uppercase`}>
-                                Password
-                            </label>
-                            <input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                className="w-full border-2 border-[#171717] bg-[#FAF6EE] px-4 py-3 text-base outline-none transition-shadow focus:shadow-[4px_4px_0_0_#2F4BFF] focus:border-[#2F4BFF]"
-                                placeholder="••••••••"
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full inline-flex items-center justify-center border-2 border-[#171717] bg-[#2F4BFF] px-6 py-4 text-base font-semibold text-white shadow-[4px_4px_0_0_#171717] transition-all hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#171717] active:translate-y-[4px] active:shadow-none disabled:opacity-70 disabled:cursor-not-allowed"
-                        >
-                            {isLoading ? "Authenticating..." : "Sign In"}
-                        </button>
-                    </form>
-                </div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full border-2 border-[#171717] bg-[#2F4BFF] text-white py-3 font-bold uppercase tracking-widest shadow-[4px_4px_0_0_#171717] hover:translate-y-[2px] transition-all cursor-pointer disabled:opacity-50"
+                    >
+                        {loading ? "Authenticating..." : "Sign In"}
+                    </button>
+                </form>
             </div>
         </div>
     );

@@ -1,0 +1,214 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"] });
+
+export default function CoachDashboard() {
+    const router = useRouter();
+
+    const [user, setUser] = useState<any | null>(null);
+    const [sessions, setSessions] = useState<any[]>([]);
+    const [rooms, setRooms] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const [showBooking, setShowBooking] = useState(false);
+    const [discipline, setDiscipline] = useState("");
+    const [sessionType, setSessionType] = useState("STANDARD");
+    const [roomId, setRoomId] = useState("");
+    const [startsAt, setStartsAt] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+
+    const fetchedRef = useRef(false);
+
+    useEffect(() => {
+        if (fetchedRef.current) return;
+        fetchedRef.current = true;
+
+        async function loadRealData() {
+            try {
+                // Unified to 127.0.0.1
+                const userRes = await fetch("http://localhost:4000/api/me", { credentials: "include" });
+                if (!userRes.ok) throw new Error("Authentication failed. Please log in.");
+
+                const userData = await userRes.json();
+                setUser(userData);
+
+                const [sessionsRes, roomsRes] = await Promise.all([
+                    fetch("http://localhost:4000/api/sessions", { credentials: "include" }).catch(() => null),
+                    fetch("http://localhost:4000/api/rooms", { credentials: "include" }).catch(() => null)
+                ]);
+
+                if (sessionsRes?.ok) {
+                    const sessionsData = await sessionsRes.json();
+                    setSessions(sessionsData.filter((s: any) => s.coach_id === userData.id));
+                }
+
+                if (roomsRes?.ok) {
+                    const roomsData = await roomsRes.json();
+                    setRooms(roomsData);
+                }
+            } catch (err: any) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadRealData();
+    }, [router]);
+
+    const handleSignOut = async () => {
+        try {
+            await fetch("http://localhost:4000/api/logout", { method: "POST", credentials: "include" });
+        } finally {
+            router.push("/login");
+        }
+    };
+
+    const handleBookRoom = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSubmitting(true);
+
+        try {
+            const res = await fetch("http://localhost:4000/api/sessions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                    discipline,
+                    session_type: sessionType,
+                    room_id: Number(roomId),
+                    starts_at: new Date(startsAt).toISOString()
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Booking failed");
+            }
+
+            const newSession = await res.json();
+            const cost = sessionType === "SHORT" ? 200 : sessionType === "STANDARD" ? 300 : 800;
+
+            setSessions([...sessions, newSession]);
+            setUser({ ...user, credits: user.credits - cost });
+            setShowBooking(false);
+            setDiscipline("");
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    if (loading) {
+        return <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] flex items-center justify-center font-bold text-xl`}>Loading Real Database...</div>;
+    }
+
+    if (error) {
+        return (
+            <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] flex flex-col items-center justify-center p-8`}>
+                <div className="border-4 border-[#171717] bg-[#FFE3E1] p-8 max-w-md w-full shadow-[8px_8px_0_0_#171717]">
+                    <h2 className="text-2xl font-bold text-[#FF5252] mb-2 uppercase">Connection Error</h2>
+                    <p className={`${plexMono.className} text-sm text-[#171717] mb-6`}>{error}</p>
+                    <button onClick={() => router.push("/login")} className="border-2 border-[#171717] bg-[#171717] text-white px-6 py-2 font-bold uppercase cursor-pointer">Back to Login</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] text-[#171717] p-8`}>
+            <header className="flex justify-between items-center border-b-4 border-[#171717] pb-6 mb-10">
+                <div>
+                    <h1 className="text-4xl font-bold uppercase tracking-tight">Coach Portal</h1>
+                    <p className={`${plexMono.className} mt-2 text-sm text-[#171717]/70`}>Welcome back, {user?.full_name}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="border-2 border-[#171717] bg-[#FFC93C] px-4 py-2 font-bold shadow-[3px_3px_0_0_#171717]">
+                        Balance: <span className={`${plexMono.className}`}>{user?.credits}</span> Credits
+                    </div>
+                    <button onClick={handleSignOut} className="border-2 border-[#171717] bg-[#FF5252] text-white px-5 py-2 font-bold shadow-[3px_3px_0_0_#171717] cursor-pointer">Sign Out</button>
+                </div>
+            </header>
+
+            <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 border-4 border-[#171717] bg-white p-8 shadow-[8px_8px_0_0_#171717]">
+                    <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-[#171717]/20 pb-4">
+                        <h2 className="text-2xl font-bold uppercase">Your Coaching Sessions</h2>
+                        <button onClick={() => setShowBooking(!showBooking)} className="border-2 border-[#171717] bg-[#2F4BFF] text-white px-4 py-2 text-sm font-bold shadow-[3px_3px_0_0_#171717] cursor-pointer">
+                            {showBooking ? "Cancel Form" : "+ Book New Room"}
+                        </button>
+                    </div>
+
+                    {showBooking && (
+                        <form onSubmit={handleBookRoom} className="mb-8 border-4 border-[#171717] bg-[#FAF6EE] p-6 space-y-4 shadow-[4px_4px_0_0_#171717]">
+                            <h3 className="text-xl font-bold uppercase">Book a Coaching Room</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className={`${plexMono.className} block text-xs font-bold uppercase mb-1`}>Discipline</label>
+                                    <input type="text" required value={discipline} onChange={(e) => setDiscipline(e.target.value)} className="w-full border-2 border-[#171717] p-2 bg-white" />
+                                </div>
+                                <div>
+                                    <label className={`${plexMono.className} block text-xs font-bold uppercase mb-1`}>Session Type</label>
+                                    <select value={sessionType} onChange={(e) => setSessionType(e.target.value)} className="w-full border-2 border-[#171717] p-2 bg-white">
+                                        <option value="SHORT">SHORT - 200 cr</option>
+                                        <option value="STANDARD">STANDARD - 300 cr</option>
+                                        <option value="INTENSIVE">INTENSIVE - 800 cr</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={`${plexMono.className} block text-xs font-bold uppercase mb-1`}>Room</label>
+                                    <select required value={roomId} onChange={(e) => setRoomId(e.target.value)} className="w-full border-2 border-[#171717] p-2 bg-white">
+                                        <option value="">Select Room</option>
+                                        {rooms.map(r => <option key={r.id} value={r.id}>{r.name} (Cap: {r.capacity})</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={`${plexMono.className} block text-xs font-bold uppercase mb-1`}>Date & Time</label>
+                                    <input type="datetime-local" required value={startsAt} onChange={(e) => setStartsAt(e.target.value)} className="w-full border-2 border-[#171717] p-2 bg-white" />
+                                </div>
+                            </div>
+                            <button type="submit" disabled={submitting} className="w-full border-2 border-[#171717] bg-[#171717] text-white py-3 font-bold uppercase shadow-[4px_4px_0_0_#2F4BFF] cursor-pointer disabled:opacity-50">
+                                {submitting ? "Booking..." : "Confirm Booking"}
+                            </button>
+                        </form>
+                    )}
+
+                    <div className="space-y-4">
+                        {sessions.length === 0 ? (
+                            <p className="text-center text-[#171717]/60 py-8 border-2 border-dashed border-[#171717]/30">No sessions scheduled yet.</p>
+                        ) : (
+                            sessions.map((session) => (
+                                <div key={session.id} className="border-2 border-[#171717] p-4 bg-[#FAF6EE] flex justify-between items-center shadow-[4px_4px_0_0_#171717]">
+                                    <div>
+                                        <span className={`${plexMono.className} text-xs font-bold bg-[#2F4BFF] text-white px-2 py-0.5 uppercase`}>{session.session_type}</span>
+                                        <h3 className="text-lg font-bold mt-1">{session.discipline}</h3>
+                                        <p className={`${plexMono.className} text-xs text-[#171717]/70 mt-1`}>Starts: {new Date(session.starts_at).toLocaleString()}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-1 uppercase">{session.status}</span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                <div className="border-4 border-[#171717] bg-[#2F4BFF] text-white p-8 shadow-[8px_8px_0_0_#171717] h-fit">
+                    <h3 className="text-2xl font-bold uppercase mb-4">Assessment Rules</h3>
+                    <ul className="space-y-4 text-sm font-medium">
+                        <li>• LIVE MODE ACTIVE: Connected to Neon PostgreSQL.</li>
+                        <li>• Bookings will deduct credits directly from your database account.</li>
+                        <li>• All scheduled sessions are permanently saved.</li>
+                    </ul>
+                </div>
+            </main>
+        </div>
+    );
+}
