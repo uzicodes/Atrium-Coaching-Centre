@@ -102,14 +102,25 @@ router.get('/:id', requireSession, async (req, res) => {
 router.post('/', requireSession, async (req, res) => {
   try {
     const body = req.body || {};
-    const { room_id, coach_id, discipline, session_type, starts_at, ends_at } = body;
+    const { room_id, discipline, session_type, starts_at } = body;
+    const coach_id = res.locals.personId;
 
-    if (!room_id || !coach_id || !discipline || !session_type || !starts_at || !ends_at) {
+    if (!room_id || !discipline || !session_type || !starts_at) {
       res.status(400).json({
-        error: 'room_id, coach_id, discipline, session_type, starts_at and ends_at are all required'
+        error: 'room_id, discipline, session_type and starts_at are all required'
       });
       return;
     }
+
+
+    const typeKey = String(session_type).toLowerCase();
+    let durationMins = 45; // SHORT is 45 minutes
+    if (typeKey === 'standard') durationMins = 60; // STANDARD is 60 minutes
+    if (typeKey === 'intensive') durationMins = 210; // INTENSIVE is 210 mins (180 teaching + 30 lunch)
+
+    const startsAtDate = new Date(starts_at);
+    const endsAtDate = new Date(startsAtDate.getTime() + durationMins * 60 * 1000);
+    const ends_at = endsAtDate.toISOString();
 
     const rooms = await query('select id, name, capacity from room where id = $1', [room_id]);
     if (rooms.length === 0) {
@@ -127,8 +138,9 @@ router.post('/', requireSession, async (req, res) => {
       `select id, starts_at, ends_at
          from session
         where room_id = $1
-          and starts_at <= $3
-          and ends_at >= $2
+          and status <> 'cancelled'
+          and starts_at < $3
+          and ends_at > $2
         limit 1`,
       [room_id, starts_at, ends_at]
     );
@@ -142,6 +154,12 @@ router.post('/', requireSession, async (req, res) => {
     const seat = seatFee(session_type);
 
     const created = await withTransaction(async (client) => {
+      const updated = await client.query('update person set credits = credits - $1 where id = $2 and credits >= $1 returning id', [fee, coach_id]);
+
+      if (updated.rowCount === 0) {
+        throw new Error('Insufficient credits');
+      }
+
       const inserted = await client.query(
         `insert into session
            (room_id, coach_id, discipline, session_type, status, starts_at, ends_at,
@@ -151,15 +169,17 @@ router.post('/', requireSession, async (req, res) => {
         [room_id, coach_id, discipline, session_type, starts_at, ends_at, fee, seat]
       );
 
-      await client.query('update person set credits = credits - $1 where id = $2', [fee, coach_id]);
-
       return inserted.rows[0];
     });
 
     res.status(201).json(created);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: 'could not create the session' });
+    if (err.message === 'Insufficient credits') {
+      res.status(400).json({ error: 'Insufficient credits' });
+    } else {
+      res.status(500).json({ error: 'could not create the session' });
+    }
   }
 });
 
@@ -282,3 +302,67 @@ router.post('/:id/cancel', requireSession, async (req, res) => {
 });
 
 export default router;
+
+router.post('/:id/book', requireSession, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(404).json({ error: 'no such session' });
+      return;
+    }
+    const personId = res.locals.personId;
+
+    const result = await withTransaction(async (client) => {
+      const sessions = await client.query('select * from session where id = $1 for update', [id]);
+      if (sessions.rowCount === 0) throw new Error('NOT_FOUND');
+      const session = sessions.rows[0];
+
+      if (session.status === 'cancelled') throw new Error('CANCELLED');
+      if (session.coach_id === personId) throw new Error('COACH_CANNOT_ENROL');
+
+      const rooms = await client.query('select capacity from room where id = $1', [session.room_id]);
+      const roomCapacity = rooms.rows[0].capacity;
+
+      const enrolments = await client.query("select id, person_id from enrolment where session_id = $1 and status = 'active'", [id]);
+
+      if (enrolments.rows.some(e => e.person_id === personId)) {
+        throw new Error('ALREADY_ENROLLED');
+      }
+
+      if (enrolments.rows.length >= roomCapacity) {
+        throw new Error('FULL');
+      }
+
+      const seatFeeVal = Number(session.seat_fee_credits);
+
+      const updatedPerson = await client.query(
+        'update person set credits = credits - $1 where id = $2 and credits >= $1 returning id',
+        [seatFeeVal, personId]
+      );
+
+      if (updatedPerson.rowCount === 0) {
+        throw new Error('INSUFFICIENT_CREDITS');
+      }
+
+      const inserted = await client.query(
+        `insert into enrolment (session_id, person_id, credits_charged, enrolled_at)
+         values ($1, $2, $3, now()) returning *`,
+        [id, personId, seatFeeVal]
+      );
+
+      return inserted.rows[0];
+    });
+
+    res.status(201).json(result);
+  } catch (err: any) {
+    console.error(err);
+    if (err.message === 'NOT_FOUND') return res.status(404).json({ error: 'no such session' });
+    if (err.message === 'CANCELLED') return res.status(400).json({ error: 'session is cancelled' });
+    if (err.message === 'COACH_CANNOT_ENROL') return res.status(400).json({ error: 'coach cannot enrol in their own session' });
+    if (err.message === 'ALREADY_ENROLLED') return res.status(400).json({ error: 'already enrolled' });
+    if (err.message === 'FULL') return res.status(409).json({ error: 'session is full' });
+    if (err.message === 'INSUFFICIENT_CREDITS') return res.status(400).json({ error: 'insufficient credits' });
+
+    res.status(500).json({ error: 'could not book the session' });
+  }
+});
