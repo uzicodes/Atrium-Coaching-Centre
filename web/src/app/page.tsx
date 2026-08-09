@@ -4,13 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 
-/**
- * Fonts
- * Space Grotesk is the mandated primary face — used across display and
- * body, swinging from black-weight headlines down to medium body text.
- * IBM Plex Mono is the utility face reserved for anything that's a number:
- * credits, fees, durations, the ticker.
- */
+
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -23,9 +17,7 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-mono",
 });
 
-/* ---------------------------------------------------------------------- */
-/* Data                                                                    */
-/* ---------------------------------------------------------------------- */
+/* Data */
 
 type FeeTier = {
   tag: string;
@@ -97,9 +89,7 @@ const tickerItems = [
   "COACHES START AT 2,000creds",
 ];
 
-/* ---------------------------------------------------------------------- */
-/* Style helpers                                                          */
-/* ---------------------------------------------------------------------- */
+/* Style helpers */
 
 const ACCENTS = {
   mint: { bg: "bg-[#17A672]", text: "text-[#17A672]", soft: "bg-[#DFF3EA]" },
@@ -114,13 +104,9 @@ function pillColor(percent: number): { bg: string; text: string } {
   return { bg: "bg-[#FFE3E1]", text: "text-[#FF5252]" };
 }
 
-/* ---------------------------------------------------------------------- */
-/* Reusable bits                                                          */
-/* ---------------------------------------------------------------------- */
 
-/** Refund schedule, as a plain statement list: one row per notice window,
- *  the window on the left, the refund rate as a badge on the right. No
- *  chart to decode — just read down the list. */
+/* Reusable bits */
+
 function RefundSchedule({ tiers }: { tiers: RefundTier[] }) {
   return (
     <dl className="border-2 border-[#171717] bg-[#FAF6EE]">
@@ -157,9 +143,9 @@ function SectionTag({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* ---------------------------------------------------------------------- */
+
+
 /* Page                                                                    */
-/* ---------------------------------------------------------------------- */
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -169,9 +155,9 @@ export default function Home() {
       className={`${spaceGrotesk.variable} ${plexMono.variable} min-h-screen bg-[#FAF6EE] text-[#171717] antialiased`}
       style={{ fontFamily: "var(--font-display), sans-serif" }}
     >
-      {/* ------------------------------------------------------------- */}
-      {/* Header                                                        */}
-      {/* ------------------------------------------------------------- */}
+
+
+      {/* Header */}
       <header className="sticky top-0 z-50 border-b-2 border-[#171717] bg-[#FAF6EE]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <a
@@ -183,7 +169,7 @@ export default function Home() {
                 A
               </span>
             </span>
-            <span className="text-xl font-bold tracking-tight">Atrium</span>
+            <span className="text-xl font-bold tracking-tight">ATRIUM</span>
           </a>
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
@@ -249,9 +235,10 @@ export default function Home() {
         )}
       </header>
 
-      {/* ------------------------------------------------------------- */}
+
+
       {/* Ticker                                                        */}
-      {/* ------------------------------------------------------------- */}
+
       <div className="overflow-hidden border-b-2 border-[#171717] bg-[#171717] py-2.5">
         <div
           className="flex w-max animate-[ticker_28s_linear_infinite] gap-10 motion-reduce:animate-none"
