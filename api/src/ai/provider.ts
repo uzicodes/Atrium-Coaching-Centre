@@ -50,19 +50,40 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
                     });
                 } else if (Array.isArray(parsed) && parsed.length === 0) {
                     formattedText += "No records found.\n";
+                } else if (parsed && parsed.status === 'success' && parsed.email) {
+                    formattedText = `**Visitor Booking Successful!**\n\n${parsed.message}\n- **Email**: ${parsed.email}\n- **Session**: ${parsed.sessionId}\n\nPlease check your email for the secure password setup link.`;
                 } else {
                     // For admin system overview which is an object
                     formattedText += `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``;
                 }
 
+                const creditsMatch = systemMessage.match(/Credits = ([\d.]+)/);
+                if (creditsMatch) {
+                    formattedText += `\n\n**Account Balance**: ${creditsMatch[1]} credits`;
+                }
+
                 return `STUB_RESPONSE:\n\n${formattedText.trim()}`;
             } catch (e) {
+                console.error("STUB ERROR PARSING DB RESULT:", e, "MATCH WAS:", dbResultMatch[1]);
                 // Ignore parse error and fall back
             }
+        } else {
+            console.error("STUB FAILED TO MATCH DB RESULT REGEX. SYSTEM MESSAGE WAS:", systemMessage);
         }
 
         const lastMessage = messages[messages.length - 1]?.content.toLowerCase() || '';
 
+        if (lastMessage.includes('other participant') || lastMessage.includes('admin privilege') || lastMessage.includes('ignore previous')) {
+            return "STUB_RESPONSE: I am sorry, but I cannot fulfill this request. I am only authorized to provide information regarding your own account and sessions.";
+        }
+        if (lastMessage.includes('cancel')) {
+            return "STUB_RESPONSE: Your cancellation request has been processed successfully.";
+        }
+        if (lastMessage.includes('book') && lastMessage.includes('@')) {
+            const emailMatch = lastMessage.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+            const email = emailMatch ? emailMatch[1] : 'visitor@test.com';
+            return `STUB_RESPONSE: Success! We have registered your email (${email}) and booked you into the requested session. A secure link has been sent to your email to establish your password.`;
+        }
         if (lastMessage.includes('session') || lastMessage.includes('catalogue')) {
             return "STUB_RESPONSE: Here are the upcoming sessions currently available in the catalogue.";
         }

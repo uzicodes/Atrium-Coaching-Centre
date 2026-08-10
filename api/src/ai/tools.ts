@@ -1,4 +1,6 @@
-import { query } from '../db';
+import crypto from 'node:crypto';
+import { query, withTransaction } from '../db';
+import { sendEmail } from '../email';
 import { UserContext } from './context';
 
 /**
@@ -87,4 +89,63 @@ export async function executeAssistantTool(toolName: string, args: any, context:
         default:
             throw new Error(`Unknown tool: ${toolName}`);
     }
+}
+
+/**
+ * Handles booking requests for anonymous visitors, creating an account if necessary.
+ */
+export async function handle_visitor_booking(email: string, sessionId: number): Promise<any> {
+    return await withTransaction(async (client) => {
+        // 1. Verify session exists and get seat_fee
+        const sessionRes = await client.query('select seat_fee_credits from session where id = $1', [sessionId]);
+        if (sessionRes.rows.length === 0) {
+            throw new Error(`Session ${sessionId} not found.`);
+        }
+        const seatFee = sessionRes.rows[0].seat_fee_credits;
+
+        // 2. Check if person exists
+        const personRes = await client.query('select id from person where email = $1', [email]);
+        let personId: number;
+        let isNewUser = false;
+
+        if (personRes.rows.length > 0) {
+            personId = personRes.rows[0].id;
+        } else {
+            // 3. Create new user
+            isNewUser = true;
+            const insertPerson = await client.query(`
+                insert into person (email, full_name, kind, password_hash, credits, active, created_at)
+                values ($1, 'Visitor', 'participant', '', 0, true, now())
+                returning id
+            `, [email]);
+            personId = insertPerson.rows[0].id;
+
+            // Generate password setup flow token
+            const setupToken = crypto.randomBytes(32).toString('hex');
+            const setupUrl = `http://localhost:3000/setup-password?token=${setupToken}`;
+
+            // Send Email
+            await sendEmail({
+                to: email,
+                subject: 'Welcome to Atrium - Secure Password Setup',
+                text: `Hello! You have been enrolled in a session. Please set up your password here: ${setupUrl}`
+            });
+        }
+
+        // 4. Create Enrolment
+        await client.query(`
+            insert into enrolment (session_id, person_id, status, credits_charged, enrolled_at)
+            values ($1, $2, 'active', $3, now())
+        `, [sessionId, personId, seatFee]);
+
+        return {
+            status: 'success',
+            message: isNewUser 
+                ? 'Account created successfully, secure password setup emailed, and session booked.'
+                : 'Session booked successfully for existing user.',
+            email,
+            sessionId,
+            isNewUser
+        };
+    });
 }
