@@ -17,28 +17,31 @@ export function startCronJobs() {
       const endUtc = endOfDay.toUTC().toISO();
 
       const sessions = await query(
-        `select s.id, s.starts_at, s.discipline, r.name as room_name, p.id as coach_id, p.full_name as coach_name, p.email as coach_email
+        `select s.id, s.starts_at, s.discipline, s.session_type, r.name as room_name, p.id as coach_id, p.full_name as coach_name, p.email as coach_email
            from session s
            join person p on p.id = s.coach_id
            join room r on r.id = s.room_id
-          where s.starts_at >= $1 and s.starts_at < $2 and s.status <> 'cancelled'
+          where lower(s.status) in ('scheduled', 'confirmed')
+            and s.starts_at >= $1 and s.starts_at < $2
           order by s.coach_id, s.starts_at`,
         [startUtc, endUtc]
       );
 
       const byCoach: Record<string, any[]> = {};
       for (const s of sessions) {
-        if (!byCoach[s.coach_email]) byCoach[s.coach_email] = [];
-        byCoach[s.coach_email].push(s);
+        const cId = String(s.coach_id);
+        if (!byCoach[cId]) byCoach[cId] = [];
+        byCoach[cId].push(s);
       }
 
-      for (const [email, coachSessions] of Object.entries(byCoach)) {
+      for (const coachSessions of Object.values(byCoach)) {
         if (coachSessions.length === 0) continue;
         
         const coachName = coachSessions[0].coach_name;
+        const email = coachSessions[0].coach_email;
         let text = `Hello ${coachName},\n\nHere is your daily summary for ${startOfDay.toISODate()}:\n\n`;
         for (const s of coachSessions) {
-           text += `- ${new Date(s.starts_at).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}: ${s.discipline} in ${s.room_name}\n`;
+           text += `- ${new Date(s.starts_at).toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}: ${s.discipline} (${s.session_type}) in ${s.room_name}\n`;
         }
         
         await sendEmail({
