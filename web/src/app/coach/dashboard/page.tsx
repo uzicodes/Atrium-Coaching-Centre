@@ -31,7 +31,6 @@ export default function CoachDashboard() {
 
         async function loadRealData() {
             try {
-                // Unified to 127.0.0.1
                 const userRes = await fetch("http://localhost:4000/api/me", { credentials: "include" });
                 if (!userRes.ok) throw new Error("Authentication failed. Please log in.");
 
@@ -92,17 +91,32 @@ export default function CoachDashboard() {
                 throw new Error(errData.error || "Booking failed");
             }
 
-            const newSession = await res.json();
-            const cost = sessionType === "SHORT" ? 200 : sessionType === "STANDARD" ? 300 : 800;
-
-            setSessions([...sessions, newSession]);
-            setUser({ ...user, credits: user.credits - cost });
-            setShowBooking(false);
-            setDiscipline("");
+            alert("Room Booked successfully!");
+            window.location.reload(); // Refresh to ensure exact DB state & emails trigger fully visually
         } catch (err: any) {
             alert(err.message);
-        } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleCancelSession = async (sessionId: number) => {
+        if (!confirm("Are you sure you want to cancel this session? Room fees and enrolled participant seats will be refunded.")) return;
+
+        try {
+            const res = await fetch(`http://localhost:4000/api/sessions/${sessionId}/cancel`, {
+                method: "POST",
+                credentials: "include"
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to cancel session");
+            }
+
+            alert("Session cancelled successfully!");
+            window.location.reload(); // Refresh to update balance and session list
+        } catch (err: any) {
+            alert(err.message);
         }
     };
 
@@ -191,8 +205,18 @@ export default function CoachDashboard() {
                                         <h3 className="text-lg font-bold mt-1">{session.discipline}</h3>
                                         <p className={`${plexMono.className} text-xs text-[#171717]/70 mt-1`}>Starts: {new Date(session.starts_at).toLocaleString()}</p>
                                     </div>
-                                    <div className="text-right">
-                                        <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-1 uppercase">{session.status}</span>
+                                    <div className="text-right flex flex-col items-end">
+                                        <span className={`text-xs font-bold px-2 py-1 uppercase mb-2 ${session.status?.toLowerCase() === 'cancelled' ? 'text-red-700 bg-red-100 border border-red-300' : 'text-emerald-700 bg-emerald-100 border border-emerald-300'}`}>
+                                            {session.status}
+                                        </span>
+                                        {session.status?.toLowerCase() !== 'cancelled' && (
+                                            <button
+                                                onClick={() => handleCancelSession(session.id)}
+                                                className="border-2 border-[#171717] bg-[#FF5252] text-white px-3 py-1 text-xs font-bold uppercase hover:bg-red-700"
+                                            >
+                                                Cancel Room
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))
@@ -201,11 +225,11 @@ export default function CoachDashboard() {
                 </div>
 
                 <div className="border-4 border-[#171717] bg-[#2F4BFF] text-white p-8 shadow-[8px_8px_0_0_#171717] h-fit">
-                    <h3 className="text-2xl font-bold uppercase mb-4">Assessment Rules</h3>
+                    <h3 className="text-2xl font-bold uppercase mb-4">Coach, Keep an Eye here</h3>
                     <ul className="space-y-4 text-sm font-medium">
-                        <li>• LIVE MODE ACTIVE: Connected to Neon PostgreSQL.</li>
-                        <li>• Bookings will deduct credits directly from your database account.</li>
-                        <li>• All scheduled sessions are permanently saved.</li>
+                        <li>• Bookings will deduct credits directly from your account.</li>
+                        <li>• Cancelling a session will refund the room fee back to your balance.</li>
+                        <li>• Emails will automatically be sent out when you cancel.</li>
                     </ul>
                 </div>
             </main>

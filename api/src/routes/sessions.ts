@@ -129,7 +129,7 @@ router.post('/', requireSession, async (req, res) => {
       return;
     }
 
-    const coaches = await query('select id, credits from person where id = $1', [coach_id]);
+    const coaches = await query('select id, credits, full_name from person where id = $1', [coach_id]);
     if (coaches.length === 0) {
       res.status(400).json({ error: 'no such coach' });
       return;
@@ -173,13 +173,17 @@ router.post('/', requireSession, async (req, res) => {
       return inserted.rows[0];
     });
 
-    const admins = await query("select email from person where kind = 'admin'");
-    for (const admin of admins) {
-      await sendEmail({
-        to: admin.email,
-        subject: 'New Session Booked',
-        text: `A new ${session_type} session was scheduled in room ${room_id} starting at ${new Date(starts_at).toLocaleString()}.`
-      });
+    try {
+      const admins = await query("select email from person where kind = 'admin'");
+      for (const admin of admins) {
+        await sendEmail({
+          to: admin.email,
+          subject: 'New Session Booked',
+          text: `Coach ${coaches[0].full_name} booked ${rooms[0].name} for a ${discipline} session starting at ${new Date(starts_at).toLocaleString()}.`
+        });
+      }
+    } catch (emailErr) {
+      console.error('Email error:', emailErr);
     }
 
     res.status(201).json(created);
@@ -285,6 +289,16 @@ router.post('/:id/cancel', requireSession, async (req, res) => {
         ]);
 
         seatsRefunded += refund;
+        
+        try {
+          await sendEmail({
+            to: enrolment.email,
+            subject: 'Session Cancelled',
+            text: `The session ${id} you were enrolled in has been cancelled. Your ${refund} credits have been refunded.`
+          });
+        } catch (emailErr) {
+          console.error('Email error:', emailErr);
+        }
       }
 
       await client.query('update person set credits = credits + $1 where id = $2', [
@@ -294,25 +308,21 @@ router.post('/:id/cancel', requireSession, async (req, res) => {
 
       await client.query("update session set status = 'cancelled' where id = $1", [id]);
 
-      return { enrolments: enrolments.rowCount, seatsRefunded, emails: enrolments.rows.map((r: any) => r.email) };
+      try {
+        const admins = await client.query("select email from person where kind = 'admin'");
+        for (const admin of admins.rows) {
+          await sendEmail({
+            to: admin.email,
+            subject: 'Session Cancelled',
+            text: `A coach cancelled session ${id} in room ${session.room_id}.`
+          });
+        }
+      } catch (emailErr) {
+        console.error('Email error:', emailErr);
+      }
+
+      return { enrolments: enrolments.rowCount, seatsRefunded };
     });
-
-    const admins = await query("select email from person where kind = 'admin'");
-    for (const admin of admins) {
-      await sendEmail({
-        to: admin.email,
-        subject: 'Session Cancelled',
-        text: `Session ${id} has been cancelled by the coach.`
-      });
-    }
-
-    for (const email of summary.emails) {
-      await sendEmail({
-        to: email,
-        subject: 'Session Cancelled',
-        text: `The session ${id} you were enrolled in has been cancelled. Your credits have been refunded.`
-      });
-    }
 
     res.json({
       id,
@@ -383,19 +393,23 @@ router.post('/:id/book', requireSession, async (req, res) => {
       return { enrolment: inserted.rows[0], hostEmail: hostCoach.rows[0]?.email, participantEmail: participantPerson.rows[0]?.email };
     });
 
-    if (result.hostEmail) {
-      await sendEmail({
-        to: result.hostEmail,
-        subject: 'New Booking',
-        text: `A new participant has booked your session ${id}.`
-      });
-    }
-    if (result.participantEmail) {
-      await sendEmail({
-        to: result.participantEmail,
-        subject: 'Booking Confirmation',
-        text: `Your booking for session ${id} is confirmed.`
-      });
+    try {
+      if (result.hostEmail) {
+        await sendEmail({
+          to: result.hostEmail,
+          subject: 'New Booking',
+          text: `A new participant has booked your session ${id}.`
+        });
+      }
+      if (result.participantEmail) {
+        await sendEmail({
+          to: result.participantEmail,
+          subject: 'Booking Confirmation',
+          text: `Your booking for session ${id} is confirmed.`
+        });
+      }
+    } catch (emailErr) {
+      console.error('Email error:', emailErr);
     }
 
     res.status(201).json(result.enrolment);

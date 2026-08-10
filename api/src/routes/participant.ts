@@ -32,8 +32,6 @@ router.get('/bookings', requireSession, async (req, res) => {
   }
 });
 
-export default router;
-
 router.post('/bookings/:id/cancel', requireSession, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -64,13 +62,17 @@ router.post('/bookings/:id/cancel', requireSession, async (req, res) => {
       );
       await client.query(`update person set credits = credits + $1 where id = $2`, [refund, personId]);
 
-      const coaches = await client.query('select email from person where id = $1', [enrolment.coach_id]);
-      if (coaches.rows.length > 0) {
-        await sendEmail({
-          to: coaches.rows[0].email,
-          subject: 'Participant Cancellation',
-          text: `Participant ${enrolment.participant_name} cancelled their booking for session on ${new Date(enrolment.starts_at).toLocaleString()}.`
-        });
+      try {
+        const coaches = await client.query('select email from person where id = $1', [enrolment.coach_id]);
+        if (coaches.rows.length > 0) {
+          await sendEmail({
+            to: coaches.rows[0].email,
+            subject: 'Participant Cancellation',
+            text: `Participant ${enrolment.participant_name} cancelled their booking for session on ${new Date(enrolment.starts_at).toLocaleString()}.`
+          });
+        }
+      } catch (emailErr) {
+        console.error('Email error:', emailErr);
       }
 
       return { status: 'cancelled', refund };
@@ -85,3 +87,5 @@ router.post('/bookings/:id/cancel', requireSession, async (req, res) => {
     res.status(500).json({ error: 'could not cancel' });
   }
 });
+
+export default router;
