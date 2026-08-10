@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   description: "Master your craft with professional coaching.",
 };
 
+import AssistantChat from "@/components/AssistantChat";
+
 export default function RootLayout({
   children,
 }: {
@@ -22,6 +24,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${spaceGrotesk.className} antialiased bg-zinc-50 text-zinc-900 selection:bg-zinc-900 selection:text-white`}>
         {children}
+        <AssistantChat />
       </body>
     </html>
   );

@@ -7,6 +7,7 @@ import sessionRoutes from './routes/sessions';
 import roomRoutes from './routes/rooms';
 import peopleRoutes from './routes/people';
 import participantRoutes from './routes/participant';
+import assistantRouter from './ai/assistant';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/people', peopleRoutes);
 app.use('/api/participant', participantRoutes);
+app.use('/api/assistant', assistantRouter);
 
 const port = Number(process.env.API_PORT) || 4000;
 
