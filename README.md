@@ -75,9 +75,7 @@ npm run dev
 With the database, Mailpit, the backend API, and the frontend all running, the unified login system is now active. Access the system at:
 
 *   **Web Interface (Unified Login):** `http://localhost:3000`
-
 *   **Mailpit Inbox:** `http://localhost:8025`
-
 *   **Backend API URL:** `http://localhost:4000`
 
 ## <span style="color: cyan;">2. Defects Found & Fixed</span>
