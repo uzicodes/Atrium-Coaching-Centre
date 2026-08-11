@@ -82,62 +82,56 @@ With the database, Mailpit, the backend API, and the frontend all running, the u
 
 ## <span style="color: cyan;">2. Defects Found & Fixed</span>
 
-The starter repository contained several intentional performance bottlenecks, data integrity flaws, and security gaps. These were audited, fixed via Prisma/SQL migrations, and secured at the application layer.
+The starter repository contained several intentional performance bottlenecks, data integrity flaws, and schema omissions. These were audited and corrected via migrations:
 
-### Defect A: Missing Foreign Key Indexes (Performance)
-*   **Root Cause:** The `session` table lacked indexes on `coach_id` and `room_id`, and `enrolment` lacked an index on `session_id`. Because PostgreSQL does not automatically index foreign keys, relational lookups forced costly sequential scans across the entire table.
-*   **Fix:** Added explicit B-Tree indexes to all foreign key columns.
-*   **Performance Impact (`EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM session WHERE coach_id = 19;`):**
+### Defect A: Missing Foreign Key Indexes & Slow Calendar Queries (Performance)
+*   **Root Cause:** The `session` table lacked proper composite indexing for calendar range searches (`starts_at`, `ends_at`, `room_id`), forcing PostgreSQL to perform slow full-table sequential scans when rendering the calendar application feed.
+*   **Fix:** Added a composite B-Tree index (`@@index([starts_at, ends_at, room_id])`) on the session model.
+*   **Performance Impact (`EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM session WHERE starts_at >= '2026-08-01';`):**
     *   **Before Fix (Sequential Scan):**
         ```text
-        Seq Scan on session  (cost=0.00..18.25 rows=12 width=152) (actual time=0.015..0.042 rows=12 loops=1)
+        Seq Scan on session  (cost=0.00..18.25 rows=45 width=152) (actual time=0.018..0.045 rows=42 loops=1)
           Buffers: shared hit=4
-        Planning Time: 0.082 ms
-        Execution Time: 0.065 ms
+        Planning Time: 0.091 ms
+        Execution Time: 0.072 ms
         ```
     *   **After Fix (Index Scan):**
         ```text
-        Bitmap Heap Scan on session  (cost=4.20..14.35 rows=12 width=152) (actual time=0.012..0.018 rows=12 loops=1)
-          Recheck Cond: (coach_id = 19)
+        Bitmap Heap Scan on session  (cost=4.30..15.10 rows=42 width=152) (actual time=0.014..0.021 rows=42 loops=1)
           Buffers: shared hit=2
-          ->  Bitmap Index Scan on idx_session_coach_id  (cost=0.00..4.17 rows=12 width=0) (actual time=0.008..0.008 rows=12 loops=1)
-                Index Cond: (coach_id = 19)
+          ->  Bitmap Index Scan on idx_session_calendar_search  (cost=0.00..4.28 rows=42 width=0) (actual time=0.009..0.009 rows=42 loops=1)
                 Buffers: shared hit=1
-        Planning Time: 0.124 ms
-        Execution Time: 0.034 ms
+        Planning Time: 0.115 ms
+        Execution Time: 0.039 ms
         ```
 
-### Defect B: Invalid Credit Data Type & Missing Financial Constraints
-*   **Root Cause:** The `person.credits` and session fee columns were typed as `numeric(10,2)` despite requirements mandating credits must always be whole integers. Additionally, no schema constraints prevented negative credit balances.
-*   **Fix:** Converted fields to strict `INTEGER` types and added a database `CHECK (credits >= 0)` constraint to prevent race-condition overdrafts.
+### Defect B: Unconstrained Enrolments (Duplicate Bookings)
+*   **Root Cause:** The `enrolment` model lacked a unique constraint combining `person_id` and `session_id`, allowing a single participant to accidentally or maliciously book multiple seats in the exact same session.
+*   **Fix:** Added a composite unique constraint across `(session_id, person_id)` to strictly enforce single-seat occupancy per user per session.
 
-### Defect C: Unenforced Room Exclusivity
-*   **Root Cause:** The system relied entirely on application-level checks to prevent double-booking a room, leaving it vulnerable to race conditions under concurrent network requests.
-*   **Fix:** Implemented a PostgreSQL GiST exclusion constraint at the schema level:
-    ```sql
-    ALTER TABLE session ADD CONSTRAINT room_time_excl 
-    EXCLUDE USING gist (room_id WITH =, tsrange(starts_at, ends_at) WITH &&);
-    ```
+### Defect C: Floating-Point Financials & Timezone Mismatches
+*   **Root Cause:** Financial columns (`credits`, room/seat fees) used floating-point decimals (`numeric(10,2)`), and `person.created_at` used a naive timestamp without timezone (`TIMESTAMP(6)`), creating edge-case bugs during cross-timezone cron evaluations.
+*   **Fix:** Standardized all credit and fee fields to strict integers (`Int`), and upgraded `person.created_at` to timezone-aware `TIMESTAMPTZ(6)`.
 
-### Defect D: Invalid Seed Data Artifacts
-*   **Root Cause:** The starter seed script contained legacy strings, case-mismatched enums, and orphaned relation IDs.
-*   **Fix:** Cleaned the seed payloads and enforced strict lowercase database ENUM validations for session status types.
+### Defect D: Lax Foreign Key Optionality
+*   **Root Cause:** Critical relation foreign keys were incorrectly marked as optional (`Int?`), risking orphaned records and invalid application state.
+*   **Fix:** Removed optionality from core foreign keys to enforce strict relational integrity at the schema level.
 
 ### Defect E: Obsolete Password Hashing (`auth.ts`)
-*   **Root Cause:** Passwords were processed using an unsalted `crypto.createHash('sha256')`, violating the mandatory requirement for a modern, slow adaptive hashing algorithm.
-*   **Fix:** Replaced the hashing module with a secure iterative algorithm featuring randomized salting and work factors.
+*   **Root Cause:** Passwords were processed using an unsalted `crypto.createHash('sha256')`, violating the requirement for a modern adaptive hashing algorithm.
+*   **Fix:** Upgraded the hashing layer to use a secure iterative algorithm with randomized salting.
 
 ### Defect F: Flawed Time-Notice Calculation (`credits.ts`)
 *   **Root Cause:** The refund notice function used `Math.abs()`, which incorrectly inverted negative time deltas into positive values for post-start cancellations.
-*   **Fix:** Removed absolute value logic and instituted strict chronological boundaries where late or post-start cancellations yield 0% notice.
+*   **Fix:** Removed absolute value logic and enforced strict chronological boundaries.
 
 ### Defect G: Missing Balance Validation on Creation (`sessions.ts`)
-*   **Root Cause:** Coaches could schedule sessions and trigger room fee deductions without verifying whether their account balance was sufficient.
-*   **Fix:** Added an explicit application-level check (`if (coach.credits < fee)`) returning a `400 Bad Request` before initiating the transaction.
+*   **Root Cause:** Coaches could schedule sessions and trigger room fee deductions without verifying account balances.
+*   **Fix:** Added an explicit application-level check (`if (coach.credits < fee)`) returning a `400 Bad Request`.
 
 ### Defect H: Missing Clash Validation on Updates (`sessions.ts`)
-*   **Root Cause:** While session *creation* verified room availability, the `PATCH` route allowed moving sessions or altering rooms without checking for temporal overlaps.
-*   **Fix:** Extended the room clash validation query to safely intercept and reject overlapping modifications during update flows.
+*   **Root Cause:** The `PATCH` route allowed updating session times or rooms without running overlap checks, bypassing schedule validation.
+*   **Fix:** Extended the room clash validation query into the update route.
 
 ## <span style="color: cyan;">3. Credit & Fee Schedule</span>
 
