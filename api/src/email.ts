@@ -5,7 +5,7 @@ let cachedTransporter: nodemailer.Transporter | null = null;
 async function getTransporter() {
     if (cachedTransporter) return cachedTransporter;
 
-    // If explicit SMTP credentials are provided, use them
+    // SMTP credentials given? use them
     if (process.env.SMTP_HOST && process.env.SMTP_HOST !== 'localhost') {
         cachedTransporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST,
@@ -19,7 +19,7 @@ async function getTransporter() {
         return cachedTransporter;
     }
 
-    // Otherwise, automatically generate a throwaway Ethereal test account on the fly!
+    // Else generate Ethereal test acc
     const testAccount = await nodemailer.createTestAccount();
     console.log(`[Ethereal] Created test account: ${testAccount.user}`);
 

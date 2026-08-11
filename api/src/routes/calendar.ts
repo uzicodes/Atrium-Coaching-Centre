@@ -6,7 +6,7 @@ const router = Router();
 
 /**
  * GET /api/calendar
- * Secure calendar endpoint enforcing strict role-based data masking at the API layer.
+ * strict role-based data masking at the API layer.
  */
 router.get('/', requireSession, async (req: Request, res: Response): Promise<void> => {
   try {

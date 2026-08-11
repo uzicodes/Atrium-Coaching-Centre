@@ -145,7 +145,7 @@ function SectionTag({ children }: { children: React.ReactNode }) {
 
 
 
-/* Page                                                                    */
+/* Page */
 
 export default function Home() {
   return (
@@ -156,7 +156,7 @@ export default function Home() {
 
 
 
-      {/* Ticker                                                        */}
+      {/* Ticker */}
 
       <div className="overflow-hidden border-b-2 border-[#171717] bg-[#171717] py-2.5">
         <div
@@ -183,9 +183,10 @@ export default function Home() {
       </div>
 
       <main id="top">
-        {/* ----------------------------------------------------------- */}
-        {/* Hero                                                        */}
-        {/* ----------------------------------------------------------- */}
+
+
+        {/* Hero */}
+
         <section className="relative overflow-hidden px-6 pb-20 pt-16 sm:pb-28 sm:pt-24">
           <div className="mx-auto max-w-6xl">
             <SectionTag>CREDIT-BASED SESSION EXCHANGE</SectionTag>
@@ -244,9 +245,11 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ----------------------------------------------------------- */}
-        {/* Fee schedule                                                */}
-        {/* ----------------------------------------------------------- */}
+
+
+
+        {/* Fee schedule */}
+
         <section id="fees" className="border-t-2 border-[#171717] px-6 py-20 sm:py-28">
           <div className="mx-auto max-w-6xl">
             <SectionTag>FEE SCHEDULE</SectionTag>
@@ -306,9 +309,9 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ----------------------------------------------------------- */}
-        {/* Coach booking policy                                        */}
-        {/* ----------------------------------------------------------- */}
+
+
+        {/* Coach booking policy*/}
         <section id="coach-policy" className="border-t-2 border-[#171717] px-6 py-20 sm:py-28">
           <div className="mx-auto max-w-6xl">
             <SectionTag>COACH BOOKING POLICY</SectionTag>
@@ -343,9 +346,9 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ----------------------------------------------------------- */}
-        {/* Participant policy                                          */}
-        {/* ----------------------------------------------------------- */}
+
+
+        {/* Participant policy*/}
         <section id="participant-policy" className="border-t-2 border-[#171717] px-6 py-20 sm:py-28">
           <div className="mx-auto max-w-6xl">
             <SectionTag>PARTICIPANT POLICY</SectionTag>
@@ -378,9 +381,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ----------------------------------------------------------- */}
-        {/* Closing CTA                                                 */}
-        {/* ----------------------------------------------------------- */}
+
+        {/* Closing CTA */}
         <section className="border-t-2 border-[#171717] bg-[#2F4BFF] px-6 py-16 text-white sm:py-20">
           <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -402,9 +404,8 @@ export default function Home() {
         </section>
       </main>
 
-      {/* --------------------------------------------------------------- */}
+
       {/* Footer                                                          */}
-      {/* --------------------------------------------------------------- */}
       <footer className="border-t-2 border-[#171717] bg-[#FAF6EE]">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 text-xs text-[#171717]/60 sm:flex-row sm:items-center sm:justify-between">
           <p>&copy; {new Date().getFullYear()} Atrium Coaching Centre.</p>

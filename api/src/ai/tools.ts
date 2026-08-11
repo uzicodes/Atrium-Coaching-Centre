@@ -4,9 +4,9 @@ import { sendEmail } from '../email';
 import { UserContext } from './context';
 import { hoursOfNotice, refundAmount, refundPercent } from '../credits';
 
-/**
- * Executes a tool query strictly filtered by the user's role and identity.
- */
+
+//tool query strictly filtered by the user's role and identity.
+
 export async function executeAssistantTool(toolName: string, args: any, context: UserContext): Promise<any> {
     const { role, personId } = context;
 
@@ -55,7 +55,6 @@ export async function executeAssistantTool(toolName: string, args: any, context:
                 throw new Error('Unauthorized: Access restricted to coaches.');
             }
 
-            // If they are a coach, force filter by their personId. If admin, they can see all or specific coach.
             const targetCoachId = role === 'admin' ? (args.coachId || personId) : personId;
 
             const result = await query(`
@@ -138,7 +137,7 @@ export async function executeAssistantTool(toolName: string, args: any, context:
                     ]);
 
                     seatsRefunded += refund;
-                    
+
                     try {
                         await sendEmail({
                             to: enrolment.email,
@@ -282,7 +281,7 @@ export async function executeAssistantTool(toolName: string, args: any, context:
                     ]);
 
                     seatsRefunded += refund;
-                    
+
                     try {
                         await sendEmail({
                             to: enrolment.email,

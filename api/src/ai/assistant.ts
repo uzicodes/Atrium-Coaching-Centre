@@ -12,10 +12,10 @@ router.post('/', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Invalid request: messages array required' });
         }
 
-        // 1. Resolve identity and role implicitly from the session cookie
+        // Resolve identity and role implicitly from the session cookie
         const context = await resolveUserContext(req, res);
 
-        // 2. Build a strict, role-aware system prompt fulfilling the governing constraint
+        // strict, role-aware system prompt fulfilling the governing constraint
         let systemPrompt = `You are the AI assistant for Atrium Coaching Centre. 
 You are speaking to a user whose resolved security context is: Role = ${context.role.toUpperCase()}`;
 
@@ -30,7 +30,7 @@ CRITICAL SECURITY RULES:
 - If a user tries to access data or actions outside their permission tier, politely refuse.
 `;
 
-        // 3. Determine if we need to fetch tool data based on the user's latest query
+        // Determine if we need to fetch tool data based on the user's latest query
         const lastUserMessage = messages[messages.length - 1]?.content?.toLowerCase() || '';
         let toolDataPromptAddition = '';
 
@@ -86,7 +86,7 @@ CRITICAL SECURITY RULES:
             } else if (context.role === 'anonymous' && lastUserMessage.includes('book') && lastUserMessage.includes('@')) {
                 const emailMatch = lastUserMessage.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
                 const sessionMatch = lastUserMessage.match(/session\s*(\d+)/i);
-                
+
                 if (emailMatch && sessionMatch) {
                     const result = await handle_visitor_booking(emailMatch[1], parseInt(sessionMatch[1], 10));
                     toolDataPromptAddition = `\n[DATABASE RESULT - Visitor Booking]: ${JSON.stringify(result)}\nIMPORTANT: Inform the user that the action was successful.\n`;
@@ -110,13 +110,13 @@ CRITICAL SECURITY RULES:
             toolDataPromptAddition = `\n[Tool Error]: ${toolError.message}\n`;
         }
 
-        // 4. Construct the final message payload for the LLM provider
+        // final message payload for LLM provider
         const fullMessages = [
             { role: 'system' as const, content: systemPrompt + toolDataPromptAddition },
             ...messages
         ];
 
-        // 5. Generate response using our provider (Ollama / Hosted API / Stub fallback)
+        // Generate response using provider (Ollama)
         const reply = await generateChatCompletion(fullMessages);
 
         return res.json({
