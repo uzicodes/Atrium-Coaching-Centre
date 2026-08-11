@@ -35,11 +35,42 @@ CRITICAL SECURITY RULES:
         let toolDataPromptAddition = '';
 
         try {
-            if (lastUserMessage.includes('other participant') || lastUserMessage.includes('admin privilege') || lastUserMessage.includes('ignore previous') || (context.role === 'anonymous' && (lastUserMessage.includes('credit') || lastUserMessage.includes('balance') || lastUserMessage.includes('enrolled') || lastUserMessage.includes('my booking') || lastUserMessage.includes('my session')))) {
+            if (lastUserMessage.includes('other participant') || lastUserMessage.includes('admin privilege') || (context.role !== 'admin' && lastUserMessage.includes('system-wide')) || lastUserMessage.includes('ignore previous') || (context.role === 'anonymous' && (lastUserMessage.includes('credit') || lastUserMessage.includes('balance') || lastUserMessage.includes('enrolled') || lastUserMessage.includes('my booking') || lastUserMessage.includes('my session')))) {
                 toolDataPromptAddition = `\n[System]: User is attempting to request unauthorized data or elevate privileges. Refuse politely.\n`;
             } else if ((lastUserMessage.includes('cancel') && !lastUserMessage.includes('who cancelled')) || lastUserMessage.includes('reschedule')) {
-                // Intentionally let the LLM / stub handle cancellation/rescheduling directly
-                toolDataPromptAddition = `\n[System]: User wants to cancel or reschedule a booking or session.\n`;
+                if (context.role === 'admin') {
+                    const match = lastUserMessage.match(/#?(\d+)/);
+                    if (match) {
+                        const sessionId = parseInt(match[1], 10);
+                        const result = await executeAssistantTool('admin_cancel_session', { sessionId }, context);
+                        toolDataPromptAddition = `\n[DATABASE RESULT - Admin Cancellation]: ${JSON.stringify(result)}\nIMPORTANT: Inform the user that the session has been cancelled and the refund logic was executed.\n`;
+                    } else {
+                        toolDataPromptAddition = `\n[Tool Error]: Could not extract a valid session ID to cancel.\n`;
+                    }
+                } else if (context.role === 'participant') {
+                    let sessionId: number | null = null;
+                    const match = lastUserMessage.match(/#?(\d+)/);
+                    if (match) {
+                        sessionId = parseInt(match[1], 10);
+                    } else {
+                        const bookings = await executeAssistantTool('get_participant_bookings', {}, context);
+                        for (const b of bookings) {
+                            if (b.discipline && lastUserMessage.includes(b.discipline.toLowerCase())) {
+                                sessionId = b.session_id;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (sessionId !== null) {
+                        const result = await executeAssistantTool('cancel_participant_booking', { sessionId }, context);
+                        toolDataPromptAddition = `\n[DATABASE RESULT - Participant Cancellation]: ${JSON.stringify(result)}\nIMPORTANT: Inform the user that their booking was cancelled and credits were refunded.\n`;
+                    } else {
+                        toolDataPromptAddition = `\n[System]: User wants to cancel a booking, but could not determine the session ID or discipline from the message.\n`;
+                    }
+                } else {
+                    toolDataPromptAddition = `\n[System]: User wants to cancel or reschedule a booking or session.\n`;
+                }
             } else if (lastUserMessage.includes('book') && !lastUserMessage.includes('bookings') && !lastUserMessage.includes('@')) {
                 // Intentionally let the LLM / stub handle booking directly (unless it's 'bookings' plural which implies viewing)
                 toolDataPromptAddition = `\n[System]: User wants to book a session.\n`;

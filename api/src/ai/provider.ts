@@ -69,8 +69,16 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
                 } else if (parsed && parsed.status === 'success' && parsed.email) {
                     formattedText = `**Visitor Booking Successful!**\n\n${parsed.message}\n- **Email**: ${parsed.email}\n- **Session**: ${parsed.sessionId}\n\nPlease check your email for the secure password setup link.`;
                 } else {
-                    // For admin system overview which is an object
-                    if (parsed.totalSessions !== undefined) {
+                    if (parsed.status === 'success' && parsed.message && !parsed.email) {
+                        formattedText = `**Success!**\n\n${parsed.message}`;
+                        if (parsed.summary) {
+                            formattedText += `\n- Enrolments Cancelled: ${parsed.summary.enrolments}`;
+                            formattedText += `\n- Seat Fees Refunded: ${parsed.summary.seatsRefunded}`;
+                            formattedText += `\n- Room Fee Refunded: ${parsed.summary.roomRefund}`;
+                        } else if (parsed.refundDetails) {
+                            formattedText += `\n- Credits Refunded: ${parsed.refundDetails.refund}`;
+                        }
+                    } else if (parsed.totalSessions !== undefined) {
                         formattedText = `**System Overview**\n\n`;
                         formattedText += `- **Total Sessions**: ${parsed.totalSessions}\n`;
                         formattedText += `- **System Credit Economy**: ${parsed.systemCreditEconomy} credits\n\n`;
@@ -101,7 +109,7 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
         }
 
         if (!hasToolData) {
-            if (lastMessage.includes('other participant') || lastMessage.includes('admin privilege') || lastMessage.includes('ignore previous') || (userRole === 'ANONYMOUS' && (lastMessage.includes('credit') || lastMessage.includes('balance') || lastMessage.includes('enrolled') || lastMessage.includes('my booking') || lastMessage.includes('my session')))) {
+            if (lastMessage.includes('other participant') || lastMessage.includes('admin privilege') || (userRole !== 'ADMIN' && lastMessage.includes('system-wide')) || lastMessage.includes('ignore previous') || (userRole === 'ANONYMOUS' && (lastMessage.includes('credit') || lastMessage.includes('balance') || lastMessage.includes('enrolled') || lastMessage.includes('my booking') || lastMessage.includes('my session')))) {
                 return "STUB_RESPONSE: I am sorry, but I cannot fulfill this request. I am only authorized to provide information regarding your own account and sessions.";
             }
             if (lastMessage.includes('cancel') || lastMessage.includes('reschedule')) {

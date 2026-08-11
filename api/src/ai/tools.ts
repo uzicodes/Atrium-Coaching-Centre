@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { query, withTransaction } from '../db';
 import { sendEmail } from '../email';
 import { UserContext } from './context';
+import { hoursOfNotice, refundAmount, refundPercent } from '../credits';
 
 /**
  * Executes a tool query strictly filtered by the user's role and identity.
@@ -90,6 +91,147 @@ export async function executeAssistantTool(toolName: string, args: any, context:
                 totalSessions: sessions[0]?.total_sessions || 0,
                 usersByType: users,
                 systemCreditEconomy: totalCredits[0]?.aggregate_credits || 0
+            };
+        }
+
+        // 5. Admin Cancel Session
+        case 'admin_cancel_session': {
+            if (role !== 'admin') {
+                throw new Error('Unauthorized: Administrator access required to cancel any session.');
+            }
+
+            const sessionId = args.sessionId;
+            if (!sessionId) throw new Error('Missing sessionId');
+
+            const sessions = await query('select * from session where id = $1', [sessionId]);
+            if (sessions.length === 0) throw new Error('Session not found');
+
+            const session = sessions[0];
+            if (session.status === 'cancelled') {
+                throw new Error('Session is already cancelled');
+            }
+
+            const percent = refundPercent(hoursOfNotice(new Date(), new Date(session.starts_at)));
+            const roomRefund = refundAmount(Number(session.room_fee_credits), percent);
+
+            const summary = await withTransaction(async (client) => {
+                const enrolments = await client.query(
+                    "select e.id, e.person_id, e.credits_charged, p.email from enrolment e join person p on p.id = e.person_id where e.session_id = $1 and e.status = 'active'",
+                    [sessionId]
+                );
+
+                let seatsRefunded = 0;
+
+                for (const enrolment of enrolments.rows) {
+                    const refund = refundAmount(Number(enrolment.credits_charged), percent);
+
+                    await client.query(
+                        `update enrolment
+                            set status = 'cancelled', credits_refunded = $1, cancelled_at = now()
+                          where id = $2`,
+                        [refund, enrolment.id]
+                    );
+
+                    await client.query('update person set credits = credits + $1 where id = $2', [
+                        refund,
+                        enrolment.person_id
+                    ]);
+
+                    seatsRefunded += refund;
+                    
+                    try {
+                        await sendEmail({
+                            to: enrolment.email,
+                            subject: 'Session Cancelled',
+                            text: `The session ${sessionId} you were enrolled in has been cancelled by an administrator. Your ${refund} credits have been refunded.`
+                        });
+                    } catch (emailErr) {
+                        console.error('Email error:', emailErr);
+                    }
+                }
+
+                await client.query('update person set credits = credits + $1 where id = $2', [
+                    roomRefund,
+                    session.coach_id
+                ]);
+
+                await client.query("update session set status = 'cancelled' where id = $1", [sessionId]);
+
+                try {
+                    const admins = await client.query("select email from person where kind = 'admin'");
+                    for (const admin of admins.rows) {
+                        await sendEmail({
+                            to: admin.email,
+                            subject: 'Session Cancelled via AI Assistant',
+                            text: `An administrator cancelled session ${sessionId} in room ${session.room_id} using the AI Assistant.`
+                        });
+                    }
+                } catch (emailErr) {
+                    console.error('Email error:', emailErr);
+                }
+
+                return { enrolments: enrolments.rowCount, seatsRefunded, roomRefund };
+            });
+
+            return {
+                status: 'success',
+                message: `Session ${sessionId} has been cancelled.`,
+                summary
+            };
+        }
+
+        // 6. Participant Cancel Booking
+        case 'cancel_participant_booking': {
+            if (role !== 'participant') {
+                throw new Error('Unauthorized: You must be a participant to cancel your booking.');
+            }
+
+            const sessionId = args.sessionId;
+            if (!sessionId) throw new Error('Missing sessionId');
+
+            const result = await withTransaction(async (client) => {
+                const enrols = await client.query(`
+                    select e.*, s.starts_at, s.coach_id, p.full_name as participant_name
+                      from enrolment e
+                      join session s on s.id = e.session_id
+                      join person p on p.id = e.person_id
+                     where e.session_id = $1 and e.person_id = $2 for update
+                `, [sessionId, personId]);
+
+                if (enrols.rowCount === 0) throw new Error('Booking not found for this session');
+                const enrolment = enrols.rows[0];
+
+                if (enrolment.status === 'cancelled') throw new Error('Booking is already cancelled');
+
+                const percent = refundPercent(hoursOfNotice(new Date(), new Date(enrolment.starts_at)));
+                const refund = refundAmount(Number(enrolment.credits_charged), percent);
+
+                await client.query(
+                    `update enrolment set status = 'cancelled', credits_refunded = $1, cancelled_at = now() where id = $2`,
+                    [refund, enrolment.id]
+                );
+                await client.query(`update person set credits = credits + $1 where id = $2`, [refund, personId]);
+
+                try {
+                    const coaches = await client.query('select email from person where id = $1', [enrolment.coach_id]);
+                    if (coaches.rows.length > 0) {
+                        await sendEmail({
+                            to: coaches.rows[0].email,
+                            subject: 'Participant Cancellation via AI Assistant',
+                            text: `Participant ${enrolment.participant_name} cancelled their booking for session on ${new Date(enrolment.starts_at).toLocaleString()} via the AI Assistant.`
+                        });
+                    }
+                } catch (emailErr) {
+                    console.error('Email error:', emailErr);
+                }
+
+                return { status: 'cancelled', refund };
+            });
+
+            return {
+                status: 'success',
+                message: `Your booking for session ${sessionId} has been cancelled.`,
+                refundDetails: result
             };
         }
 
