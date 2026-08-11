@@ -164,11 +164,11 @@ export default function Home() {
             href="#top"
             className="flex items-center gap-2.5 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2F4BFF]"
           >
-            <span className="flex h-9 w-9 items-center justify-center border-2 border-[#171717] bg-[#2F4BFF] text-white shadow-[3px_3px_0_0_#171717]">
-              <span className={`${plexMono.className} text-base font-semibold`}>
-                A
-              </span>
-            </span>
+            <img 
+              src="/logo.webp" 
+              alt="Atrium Logo" 
+              className="h-9 w-auto object-contain" 
+            />
             <span className="text-xl font-bold tracking-tight">ATRIUM</span>
           </a>
 

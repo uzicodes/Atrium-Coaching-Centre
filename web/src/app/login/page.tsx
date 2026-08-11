@@ -52,10 +52,20 @@ export default function LoginPage() {
     };
 
     return (
-        <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] text-[#171717] flex items-center justify-center p-6`}>
-            <div className="border-4 border-[#171717] bg-white p-8 max-w-md w-full shadow-[8px_8px_0_0_#171717]">
-                <h1 className="text-3xl font-bold uppercase mb-2">Portal Login</h1>
-                <p className={`${plexMono.className} text-xs text-[#171717]/70 mb-6`}>
+        <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] text-[#171717] flex flex-col items-center justify-center p-6`}>
+            <div className="max-w-md w-full mb-4">
+                <button
+                    type="button"
+                    onClick={() => router.push("/")}
+                    className="inline-flex items-center gap-2 border-2 border-[#171717] bg-white text-[#171717] px-4 py-2 text-xs font-bold uppercase tracking-wider shadow-[3px_3px_0_0_#171717] hover:translate-y-[2px] hover:shadow-[1px_1px_0_0_#171717] transition-all cursor-pointer"
+                >
+                    ← Homepage
+                </button>
+            </div>
+
+            <div className="border-4 border-[#008000] bg-white p-8 max-w-md w-full shadow-[8px_8px_0_0_#171717]">
+                <h1 className="text-3xl font-bold uppercase mb-2 text-[#008000] text-center">Portal Login</h1>
+                <p className={`${plexMono.className} text-xs text-[#171717]/70 mb-6 text-center`}>
                     Sign in using your authorized credentials.
                 </p>
 
