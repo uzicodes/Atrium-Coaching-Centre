@@ -12,10 +12,20 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
     // 1. Deterministic Stub for Tests & Local Dev
     if (provider === 'stub' || process.env.NODE_ENV === 'test') {
         const systemMessage = messages.find(m => m.role === 'system')?.content || '';
+        const lastMessage = messages[messages.length - 1]?.content.toLowerCase() || '';
         
+        const roleMatch = systemMessage.match(/Role\s*=\s*([A-Z]+)/i);
+        const userRole = roleMatch ? roleMatch[1].toUpperCase() : 'ANONYMOUS';
+
+        if ((lastMessage.includes('revenue') || lastMessage.includes('global') || lastMessage.includes('administrator')) && userRole !== 'ADMIN') {
+            return "STUB_RESPONSE: I am sorry, but I cannot fulfill this request. I am only authorized to provide information regarding your own account and sessions.";
+        }
+
         // Extract database result if present
+        let hasToolData = false;
         const dbResultMatch = systemMessage.match(/\[DATABASE RESULT[^\]]*\]:\s*(\[.*\]|\{.*\})/);
         if (dbResultMatch && dbResultMatch[1]) {
+            hasToolData = true;
             try {
                 const parsed = JSON.parse(dbResultMatch[1]);
                 let formattedText = 'Here are the database records you requested:\n\n';
@@ -46,7 +56,13 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
                             remaining = `Status: ${item.enrolment_status}`;
                         }
 
-                        formattedText += `- **${disc} (${type})**\n  Date & Time: ${dateStr}\n  Coach & Room: ${coachRoom || 'TBD'}\n  Places Remaining: ${remaining}\n\n`;
+                        formattedText += `- **${disc} (${type})**\n  Date & Time: ${dateStr}\n  Coach & Room: ${coachRoom || 'TBD'}\n  Places Remaining: ${remaining}\n`;
+                        
+                        if (item.enrolments && Array.isArray(item.enrolments)) {
+                            formattedText += `  Participants: ${item.enrolments.map((e: any) => e.participant + " (" + e.status + ")").join(', ')}\n`;
+                        }
+                        
+                        formattedText += `\n`;
                     });
                 } else if (Array.isArray(parsed) && parsed.length === 0) {
                     formattedText += "No records found.\n";
@@ -54,7 +70,20 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
                     formattedText = `**Visitor Booking Successful!**\n\n${parsed.message}\n- **Email**: ${parsed.email}\n- **Session**: ${parsed.sessionId}\n\nPlease check your email for the secure password setup link.`;
                 } else {
                     // For admin system overview which is an object
-                    formattedText += `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``;
+                    if (parsed.totalSessions !== undefined) {
+                        formattedText = `**System Overview**\n\n`;
+                        formattedText += `- **Total Sessions**: ${parsed.totalSessions}\n`;
+                        formattedText += `- **System Credit Economy**: ${parsed.systemCreditEconomy} credits\n\n`;
+                        formattedText += `**User Distribution**:\n`;
+                        if (parsed.usersByType && Array.isArray(parsed.usersByType)) {
+                            parsed.usersByType.forEach((u: any) => {
+                                const roleName = String(u.kind).charAt(0).toUpperCase() + String(u.kind).slice(1);
+                                formattedText += `- ${roleName}: ${u.count}\n`;
+                            });
+                        }
+                    } else {
+                        formattedText += `\`\`\`json\n${JSON.stringify(parsed, null, 2)}\n\`\`\``;
+                    }
                 }
 
                 const creditsMatch = systemMessage.match(/Credits = ([\d.]+)/);
@@ -71,25 +100,26 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
             console.error("STUB FAILED TO MATCH DB RESULT REGEX. SYSTEM MESSAGE WAS:", systemMessage);
         }
 
-        const lastMessage = messages[messages.length - 1]?.content.toLowerCase() || '';
+        if (!hasToolData) {
+            if (lastMessage.includes('other participant') || lastMessage.includes('admin privilege') || lastMessage.includes('ignore previous') || (userRole === 'ANONYMOUS' && (lastMessage.includes('credit') || lastMessage.includes('balance') || lastMessage.includes('enrolled') || lastMessage.includes('my booking') || lastMessage.includes('my session')))) {
+                return "STUB_RESPONSE: I am sorry, but I cannot fulfill this request. I am only authorized to provide information regarding your own account and sessions.";
+            }
+            if (lastMessage.includes('cancel') || lastMessage.includes('reschedule')) {
+                return "STUB_RESPONSE: Your cancellation request has been processed successfully.";
+            }
+            if (lastMessage.includes('book') && lastMessage.includes('@')) {
+                const emailMatch = lastMessage.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+                const email = emailMatch ? emailMatch[1] : 'visitor@test.com';
+                return `STUB_RESPONSE: Success! We have registered your email (${email}) and booked you into the requested session. A secure link has been sent to your email to establish your password.`;
+            }
+            if (lastMessage.includes('session') || lastMessage.includes('catalogue')) {
+                return "STUB_RESPONSE: Here are the upcoming sessions currently available in the catalogue.";
+            }
+            if (lastMessage.includes('book')) {
+                return "STUB_RESPONSE: Your booking request has been processed successfully.";
+            }
+        }
 
-        if (lastMessage.includes('other participant') || lastMessage.includes('admin privilege') || lastMessage.includes('ignore previous')) {
-            return "STUB_RESPONSE: I am sorry, but I cannot fulfill this request. I am only authorized to provide information regarding your own account and sessions.";
-        }
-        if (lastMessage.includes('cancel')) {
-            return "STUB_RESPONSE: Your cancellation request has been processed successfully.";
-        }
-        if (lastMessage.includes('book') && lastMessage.includes('@')) {
-            const emailMatch = lastMessage.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
-            const email = emailMatch ? emailMatch[1] : 'visitor@test.com';
-            return `STUB_RESPONSE: Success! We have registered your email (${email}) and booked you into the requested session. A secure link has been sent to your email to establish your password.`;
-        }
-        if (lastMessage.includes('session') || lastMessage.includes('catalogue')) {
-            return "STUB_RESPONSE: Here are the upcoming sessions currently available in the catalogue.";
-        }
-        if (lastMessage.includes('book')) {
-            return "STUB_RESPONSE: Your booking request has been processed successfully.";
-        }
         return "STUB_RESPONSE: I am your Atrium assistant stub. How can I help you with your sessions today?";
     }
 

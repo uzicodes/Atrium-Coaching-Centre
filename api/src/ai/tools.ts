@@ -10,7 +10,7 @@ export async function executeAssistantTool(toolName: string, args: any, context:
     const { role, personId } = context;
 
     switch (toolName) {
-        // 1. Catalogue / Available Sessions (Accessible to EVERYONE, including anonymous)
+        // 1. Catalogue / Available Sessions
         case 'get_available_sessions': {
             const result = await query(`
         select s.id, s.discipline, s.session_type, s.starts_at, s.ends_at,
@@ -28,7 +28,7 @@ export async function executeAssistantTool(toolName: string, args: any, context:
             return result;
         }
 
-        // 2. Participant Bookings (Strictly restricted to the logged-in participant)
+        // 2. Participant Bookings
         case 'get_participant_bookings': {
             if (role !== 'participant' && role !== 'coach') {
                 throw new Error('Unauthorized: You must be logged in as a participant to view your bookings.');
@@ -48,7 +48,7 @@ export async function executeAssistantTool(toolName: string, args: any, context:
             return result;
         }
 
-        // 3. Coach Sessions (Strictly restricted to the logged-in coach seeing their own sessions)
+        // 3. Coach Sessions 
         case 'get_coach_sessions': {
             if (role !== 'coach' && role !== 'admin') {
                 throw new Error('Unauthorized: Access restricted to coaches.');
@@ -59,10 +59,17 @@ export async function executeAssistantTool(toolName: string, args: any, context:
 
             const result = await query(`
         select s.id as session_id, s.discipline, s.session_type, s.status, s.starts_at, s.ends_at,
-               r.name as room_name,
+               r.name as room_name, p.full_name as coach_name,
+               (
+                   select json_agg(json_build_object('participant', person.full_name, 'status', e.status))
+                   from enrolment e
+                   join person on person.id = e.person_id
+                   where e.session_id = s.id
+               ) as enrolments,
                (select count(*) from enrolment e where e.session_id = s.id and e.status = 'active') as active_enrolments
           from session s
           join room r on r.id = s.room_id
+          join person p on p.id = s.coach_id
          where s.coach_id = $1
          order by s.starts_at desc
       `, [targetCoachId]);
@@ -140,7 +147,7 @@ export async function handle_visitor_booking(email: string, sessionId: number): 
 
         return {
             status: 'success',
-            message: isNewUser 
+            message: isNewUser
                 ? 'Account created successfully, secure password setup emailed, and session booked.'
                 : 'Session booked successfully for existing user.',
             email,
