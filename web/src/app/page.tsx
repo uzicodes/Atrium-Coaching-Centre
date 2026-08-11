@@ -148,92 +148,11 @@ function SectionTag({ children }: { children: React.ReactNode }) {
 /* Page                                                                    */
 
 export default function Home() {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   return (
     <div
       className={`${spaceGrotesk.variable} ${plexMono.variable} min-h-screen bg-[#FAF6EE] text-[#171717] antialiased`}
       style={{ fontFamily: "var(--font-display), sans-serif" }}
     >
-
-
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b-2 border-[#171717] bg-[#FAF6EE]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <a
-            href="#top"
-            className="flex items-center gap-2.5 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2F4BFF]"
-          >
-            <img 
-              src="/logo.webp" 
-              alt="Atrium Logo" 
-              className="h-9 w-auto object-contain" 
-            />
-            <span className="text-xl font-bold tracking-tight">ATRIUM</span>
-          </a>
-
-          <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-[#171717]/70 transition-colors hover:text-[#171717] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2F4BFF]"
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="hidden items-center border-2 border-[#171717] bg-[#2F4BFF] px-5 py-2.5 text-sm font-semibold text-white shadow-[3px_3px_0_0_#171717] transition-transform hover:-translate-y-0.5 hover:shadow-[5px_5px_0_0_#171717] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#171717] sm:inline-flex motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-            >
-              Sign in
-            </Link>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-expanded={menuOpen}
-              aria-controls="mobile-nav"
-              className="inline-flex h-10 w-10 items-center justify-center border-2 border-[#171717] text-[#171717] md:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2F4BFF]"
-            >
-              <span className="sr-only">Toggle menu</span>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                <path
-                  d="M2 5H16M2 9H16M2 13H16"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {menuOpen && (
-          <div id="mobile-nav" className="border-t-2 border-[#171717] bg-[#FAF6EE] px-6 py-4 md:hidden">
-            <nav className="flex flex-col gap-4" aria-label="Mobile">
-              {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="text-sm font-medium text-[#171717]/70 hover:text-[#171717]"
-                >
-                  {link.label}
-                </a>
-              ))}
-              <Link
-                href="/login"
-                className="mt-2 inline-flex items-center justify-center border-2 border-[#171717] bg-[#2F4BFF] px-5 py-2.5 text-sm font-semibold text-white shadow-[3px_3px_0_0_#171717]"
-              >
-                Sign in
-              </Link>
-            </nav>
-          </div>
-        )}
-      </header>
 
 
 

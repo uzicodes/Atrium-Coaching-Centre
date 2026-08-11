@@ -150,11 +150,10 @@ export default function ParticipantDashboard() {
                     <h1 className="text-3xl md:text-4xl font-bold uppercase tracking-tight">Participant Portal</h1>
                     <p className={`${plexMono.className} mt-2 text-sm text-[#171717]/70`}>Welcome back, {user?.full_name}</p>
                 </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full md:w-auto">
+                <div>
                     <div className="border-2 border-[#171717] bg-[#FFC93C] px-4 py-2 font-bold shadow-[3px_3px_0_0_#171717] text-center">
                         Credits: <span className={`${plexMono.className}`}>{user?.credits}</span>
                     </div>
-                    <button onClick={handleSignOut} className="border-2 border-[#171717] bg-[#FF5252] text-white px-5 py-2 font-bold shadow-[3px_3px_0_0_#171717] cursor-pointer w-full sm:w-auto">Sign Out</button>
                 </div>
             </header>
 

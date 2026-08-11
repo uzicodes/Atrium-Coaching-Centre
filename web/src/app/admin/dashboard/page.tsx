@@ -99,17 +99,9 @@ export default function AdminDashboard() {
 
     return (
         <div className={`${spaceGrotesk.className} min-h-screen bg-[#FAF6EE] text-[#171717] p-4 md:p-8`}>
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b-4 border-[#171717] pb-6 mb-10 gap-4 md:gap-0">
-                <div>
-                    <h1 className="text-3xl md:text-4xl font-bold uppercase tracking-tight">Admin Portal</h1>
-                    <p className={`${plexMono.className} mt-2 text-sm text-[#171717]/70`}>Connected to Atrium Central Database</p>
-                </div>
-                <button
-                    onClick={handleLogout}
-                    className="border-2 border-[#171717] bg-[#FF5252] text-white px-6 py-2 font-bold shadow-[4px_4px_0_0_#171717] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#171717] transition-all w-full md:w-auto cursor-pointer"
-                >
-                    Sign Out
-                </button>
+            <header className="border-b-4 border-[#171717] pb-6 mb-10">
+                <h1 className="text-3xl md:text-4xl font-bold uppercase tracking-tight">Admin Portal</h1>
+                <p className={`${plexMono.className} mt-2 text-sm text-[#171717]/70`}>Connected to Atrium Central Database</p>
             </header>
 
             <main className="grid grid-cols-1 md:grid-cols-3 gap-8 flex-col max-md:flex">

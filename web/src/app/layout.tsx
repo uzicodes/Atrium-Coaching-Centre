@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 };
 
 import AssistantChat from "@/components/AssistantChat";
+import Navbar from "@/components/Navbar";
 
 export default function RootLayout({
   children,
@@ -33,7 +34,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${spaceGrotesk.className} antialiased bg-zinc-50 text-zinc-900 selection:bg-zinc-900 selection:text-white`}>
+      <body className={`${spaceGrotesk.className} antialiased bg-[#FAF6EE] text-[#171717] selection:bg-[#171717] selection:text-white`}>
+        <Navbar />
         {children}
         <AssistantChat />
       </body>
