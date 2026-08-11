@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import CalendarView from "@/components/CalendarView";
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"] });
@@ -250,6 +251,11 @@ export default function CoachDashboard() {
                     </ul>
                 </div>
             </main>
+
+            {/* Centre Schedule & Calendar Section */}
+            <section className="mt-12 border-4 border-[#171717] bg-white p-4 md:p-8 shadow-[8px_8px_0_0_#171717]">
+                <CalendarView />
+            </section>
         </div>
     );
 }
