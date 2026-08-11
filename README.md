@@ -1,6 +1,6 @@
-# <span style="color: orange;">Atrium Coaching Centre</span>
+# 🟧 Atrium Coaching Centre
 
-## <span style="color: cyan;">1. Setup & Run Instructions</span>
+## 🔷 1. Setup & Run Instructions
 
 The following steps assume a clean environment containing only **Node.js** and **PostgreSQL**. 
 
@@ -78,7 +78,7 @@ With the database, Mailpit, the backend API, and the frontend all running, the u
 *   **Mailpit Inbox:** `http://localhost:8025`
 *   **Backend API URL:** `http://localhost:4000`
 
-## <span style="color: cyan;">2. Defects Found & Fixed</span>
+## 🔷 2. Defects Found & Fixed
 
 The starter repository contained several intentional performance bottlenecks, data integrity flaws, and schema omissions. These were audited and corrected via migrations:
 
@@ -131,7 +131,7 @@ The starter repository contained several intentional performance bottlenecks, da
 *   **Root Cause:** The `PATCH` route allowed updating session times or rooms without running overlap checks, bypassing schedule validation.
 *   **Fix:** Extended the room clash validation query into the update route.
 
-## <span style="color: cyan;">3. Credit & Fee Schedule</span>
+## 🔷 3. Credit & Fee Schedule
 
 The fee schedule scales linearly with the active teaching duration of the session, maintaining a strict 2:1 ratio between the Coach's room fee and the Participant's seat fee. 
 
@@ -154,7 +154,7 @@ The fee schedule scales linearly with the active teaching duration of the sessio
 **Scaling Logic:** 
 Fees are calculated mathematically against the `Standard` 60-minute baseline (40 credits for a room). A 45-minute `Short` session is precisely 75% of the standard cost. An `Intensive` session strictly bills for the 180 minutes of active teaching time (3x the standard rate), treating the mandatory 30-minute lunch interval as an unbilled hold.
 
-## <span style="color: cyan;">4. Participant Cancellation Policy</span>
+## 🔷 4. Participant Cancellation Policy
 
 ### Participant-Initiated Cancellations
 Refunds are calculated based on the absolute hours between cancellation and the session start time:
@@ -175,7 +175,7 @@ Partial refunds (e.g., 50% of a 15-credit *Short* session = 7.5) are rounded **u
 
 **Justification:** Because the database enforces integer-only credits, rounding up acts as a customer-friendly gesture that reduces friction during penalized cancellations.
 
-## <span style="color: cyan;">5. System Invariants</span>
+## 🔷 5. System Invariants
 
 ### Enforced in the Schema (PostgreSQL)
 1. **Non-Negative Credit Balances:** `CHECK (balance >= 0)`
@@ -189,7 +189,7 @@ Partial refunds (e.g., 50% of a 15-credit *Short* session = 7.5) are rounded **u
 2. **The INTENSIVE Lunch Interval Rule:** Validated in the scheduling service.
    * *Why:* Extracting a specific 30-minute unbilled block from the middle of a 210-minute session to cross-reference against other bookings is highly domain-specific. This logic is much easier to read, test, and maintain in TypeScript than inside complex SQL constraints.
 
-## <span style="color: cyan;">6. Database Isolation Levels</span>
+## 🔷 6. Database Isolation Levels
 
 **Isolation Level Used:** `Read Committed` (PostgreSQL / Prisma Default)  
 **Write Paths:** Used across all transactional write paths, including Coach room bookings, Participant seat bookings, and all cancellation/refund flows.
@@ -202,7 +202,7 @@ Running under `Read Committed` does **not** prevent the following anomalies:
 **Mitigation Strategy:**  
 Instead of upgrading the entire database to the slow `Serializable` isolation level (which requires complex retry logic for transaction failures), we mitigated these anomalies at the schema level. Even if Write Skew occurs during a concurrent booking, the PostgreSQL `EXCLUDE` constraint will physically reject the overlapping room, and the `CHECK (credits >= 0)` constraint will physically reject the overdraft, ensuring data integrity without sacrificing performance.
 
-## <span style="color: cyan;">7. Assumptions Made</span>
+## 🔷 7. Assumptions Made
 
 **1. The `INTENSIVE` Session Lunch Timing**
 * **Ambiguity:** The exact placement of the 30-minute lunch break within the 210-minute `INTENSIVE` session block is not specified.
@@ -219,7 +219,7 @@ Instead of upgrading the entire database to the slow `Serializable` isolation le
 * **Assumption:** The backend securely extracts the user's role and ID directly from the HTTP session/cookie, strictly ignoring any identity claims sent from the frontend payload.
 * **If wrong:** If the API relied on the client to declare its own role in the request body, a malicious user could easily alter the request to claim "administrator" privileges and steal data.
 
-## <span style="color: cyan;">8. Unfinished Work</span>
+## 🔷 8. Unfinished Work
 
 * **Scheduled Daily Digest Emails:** While the event-driven emails (cancellations and bookings) are fully implemented and viewable via Mailpit, the automated cron jobs for the 00:00 `America/New_York` daily digests are incomplete.
 * **Anonymous AI Bookings:** The AI assistant correctly handles context-aware queries for logged-in participants, coaches, and administrators. However, the flow for an anonymous visitor to book a session and securely generate a new account entirely via the chat interface is not fully implemented.
