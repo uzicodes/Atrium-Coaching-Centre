@@ -39,17 +39,26 @@ CRITICAL SECURITY RULES:
                 toolDataPromptAddition = `\n[System]: User is attempting to request unauthorized data or elevate privileges. Refuse politely.\n`;
             } else if ((lastUserMessage.includes('cancel') && !lastUserMessage.includes('who cancelled')) || lastUserMessage.includes('reschedule')) {
                 if (context.role === 'admin') {
-                    const match = lastUserMessage.match(/#?(\d+)/);
+                    const match = lastUserMessage.match(/session\s*#?\s*(\d+)/i) || lastUserMessage.match(/#?(\d+)/);
                     if (match) {
                         const sessionId = parseInt(match[1], 10);
-                        const result = await executeAssistantTool('admin_cancel_session', { sessionId }, context);
-                        toolDataPromptAddition = `\n[DATABASE RESULT - Admin Cancellation]: ${JSON.stringify(result)}\nIMPORTANT: Inform the user that the session has been cancelled and the refund logic was executed.\n`;
+                        await executeAssistantTool('admin_cancel_session', { sessionId }, context);
+                        toolDataPromptAddition = `\n[ACTION SUCCESS]: Session ${sessionId} cancelled and refunds processed.\n`;
+                    } else {
+                        toolDataPromptAddition = `\n[Tool Error]: Could not extract a valid session ID to cancel.\n`;
+                    }
+                } else if (context.role === 'coach') {
+                    const match = lastUserMessage.match(/session\s*#?\s*(\d+)/i) || lastUserMessage.match(/#?(\d+)/);
+                    if (match) {
+                        const sessionId = parseInt(match[1], 10);
+                        await executeAssistantTool('coach_cancel_session', { sessionId }, context);
+                        toolDataPromptAddition = `\n[ACTION SUCCESS]: Session ${sessionId} cancelled and refunds processed.\n`;
                     } else {
                         toolDataPromptAddition = `\n[Tool Error]: Could not extract a valid session ID to cancel.\n`;
                     }
                 } else if (context.role === 'participant') {
                     let sessionId: number | null = null;
-                    const match = lastUserMessage.match(/#?(\d+)/);
+                    const match = lastUserMessage.match(/session\s*#?\s*(\d+)/i) || lastUserMessage.match(/#?(\d+)/);
                     if (match) {
                         sessionId = parseInt(match[1], 10);
                     } else {
@@ -63,8 +72,8 @@ CRITICAL SECURITY RULES:
                     }
 
                     if (sessionId !== null) {
-                        const result = await executeAssistantTool('cancel_participant_booking', { sessionId }, context);
-                        toolDataPromptAddition = `\n[DATABASE RESULT - Participant Cancellation]: ${JSON.stringify(result)}\nIMPORTANT: Inform the user that their booking was cancelled and credits were refunded.\n`;
+                        await executeAssistantTool('cancel_participant_booking', { sessionId }, context);
+                        toolDataPromptAddition = `\n[ACTION SUCCESS]: Booking for session ${sessionId} cancelled and refunds processed.\n`;
                     } else {
                         toolDataPromptAddition = `\n[System]: User wants to cancel a booking, but could not determine the session ID or discipline from the message.\n`;
                     }

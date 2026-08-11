@@ -21,6 +21,12 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<s
             return "STUB_RESPONSE: I am sorry, but I cannot fulfill this request. I am only authorized to provide information regarding your own account and sessions.";
         }
 
+        // Extract action success if present
+        const actionSuccessMatch = systemMessage.match(/\[ACTION SUCCESS\]:\s*(.*)/);
+        if (actionSuccessMatch && actionSuccessMatch[1]) {
+            return `STUB_RESPONSE: ${actionSuccessMatch[1].trim()}`;
+        }
+
         // Extract database result if present
         let hasToolData = false;
         const dbResultMatch = systemMessage.match(/\[DATABASE RESULT[^\]]*\]:\s*(\[.*\]|\{.*\})/);

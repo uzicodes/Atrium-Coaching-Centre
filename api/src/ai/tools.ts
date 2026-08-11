@@ -235,6 +235,95 @@ export async function executeAssistantTool(toolName: string, args: any, context:
             };
         }
 
+        // 7. Coach Cancel Session
+        case 'coach_cancel_session': {
+            if (role !== 'coach') {
+                throw new Error('Unauthorized: You must be a coach to cancel this session.');
+            }
+
+            const sessionId = args.sessionId;
+            if (!sessionId) throw new Error('Missing sessionId');
+
+            const sessions = await query('select * from session where id = $1', [sessionId]);
+            if (sessions.length === 0) throw new Error('Session not found');
+
+            const session = sessions[0];
+            if (session.status === 'cancelled') {
+                throw new Error('Session is already cancelled');
+            }
+            if (session.coach_id !== personId) {
+                throw new Error('Unauthorized: You can only cancel your own sessions.');
+            }
+
+            const percent = refundPercent(hoursOfNotice(new Date(), new Date(session.starts_at)));
+            const roomRefund = refundAmount(Number(session.room_fee_credits), percent);
+
+            const summary = await withTransaction(async (client) => {
+                const enrolments = await client.query(
+                    "select e.id, e.person_id, e.credits_charged, p.email from enrolment e join person p on p.id = e.person_id where e.session_id = $1 and e.status = 'active'",
+                    [sessionId]
+                );
+
+                let seatsRefunded = 0;
+
+                for (const enrolment of enrolments.rows) {
+                    const refund = refundAmount(Number(enrolment.credits_charged), percent);
+
+                    await client.query(
+                        `update enrolment
+                            set status = 'cancelled', credits_refunded = $1, cancelled_at = now()
+                          where id = $2`,
+                        [refund, enrolment.id]
+                    );
+
+                    await client.query('update person set credits = credits + $1 where id = $2', [
+                        refund,
+                        enrolment.person_id
+                    ]);
+
+                    seatsRefunded += refund;
+                    
+                    try {
+                        await sendEmail({
+                            to: enrolment.email,
+                            subject: 'Session Cancelled',
+                            text: `The session ${sessionId} you were enrolled in has been cancelled by the coach. Your ${refund} credits have been refunded.`
+                        });
+                    } catch (emailErr) {
+                        console.error('Email error:', emailErr);
+                    }
+                }
+
+                await client.query('update person set credits = credits + $1 where id = $2', [
+                    roomRefund,
+                    session.coach_id
+                ]);
+
+                await client.query("update session set status = 'cancelled' where id = $1", [sessionId]);
+
+                try {
+                    const admins = await client.query("select email from person where kind = 'admin'");
+                    for (const admin of admins.rows) {
+                        await sendEmail({
+                            to: admin.email,
+                            subject: 'Session Cancelled via AI Assistant',
+                            text: `A coach cancelled session ${sessionId} in room ${session.room_id} using the AI Assistant.`
+                        });
+                    }
+                } catch (emailErr) {
+                    console.error('Email error:', emailErr);
+                }
+
+                return { enrolments: enrolments.rowCount, seatsRefunded, roomRefund };
+            });
+
+            return {
+                status: 'success',
+                message: `Session ${sessionId} has been cancelled.`,
+                summary
+            };
+        }
+
         default:
             throw new Error(`Unknown tool: ${toolName}`);
     }
