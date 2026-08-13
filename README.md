@@ -103,17 +103,17 @@ The starter repository contained several intentional performance bottlenecks, da
         Execution Time: 0.039 ms
         ```
 
-### Defect B: Unconstrained Enrolments (Duplicate Bookings)
-*   **Root Cause:** The `enrolment` model lacked a unique constraint combining `person_id` and `session_id`, allowing a single participant to accidentally or maliciously book multiple seats in the exact same session.
+### Defect B: Duplicate Bookings
+*   **Root Cause:** The `enrolment` model lacked a unique constraint combining `person_id` and `session_id`, allowing a single participant to accidentally or intentionally book multiple seats in the exact same session.
 *   **Fix:** Added a composite unique constraint across `(session_id, person_id)` to strictly enforce single-seat occupancy per user per session.
 
 ### Defect C: Floating-Point Financials & Timezone Mismatches
-*   **Root Cause:** Financial columns (`credits`, room/seat fees) used floating-point decimals (`numeric(10,2)`), and `person.created_at` used a naive timestamp without timezone (`TIMESTAMP(6)`), creating edge-case bugs during cross-timezone cron evaluations.
+*   **Root Cause:** Financial columns (`credits`, room/seat fees) used floating-point decimals (`numeric(10,2)`), and `person.created_at` used a timestamp without timezone (`TIMESTAMP(6)`), creating bugs during cross-timezone cron evaluations.
 *   **Fix:** Standardized all credit and fee fields to strict integers (`Int`), and upgraded `person.created_at` to timezone-aware `TIMESTAMPTZ(6)`.
 
 ### Defect D: Lax Foreign Key Optionality
-*   **Root Cause:** Critical relation foreign keys were incorrectly marked as optional (`Int?`), risking orphaned records and invalid application state.
-*   **Fix:** Removed optionality from core foreign keys to enforce strict relational integrity at the schema level.
+*   **Root Cause:** Critical relation foreign keys were incorrectly marked as optional (`Int?`), risking invalid application state.
+*   **Fix:** Removed optionality from core foreign keys to enforce strict relations at the schema level.
 
 ### Defect E: Obsolete Password Hashing (`auth.ts`)
 *   **Root Cause:** Passwords were processed using an unsalted `crypto.createHash('sha256')`, violating the requirement for a modern adaptive hashing algorithm.
@@ -125,7 +125,7 @@ The starter repository contained several intentional performance bottlenecks, da
 
 ### Defect G: Missing Balance Validation on Creation (`sessions.ts`)
 *   **Root Cause:** Coaches could schedule sessions and trigger room fee deductions without verifying account balances.
-*   **Fix:** Added an explicit application-level check (`if (coach.credits < fee)`) returning a `400 Bad Request`.
+*   **Fix:** Added an application-level check (`if (coach.credits < fee)`) returning a `400 Bad Request`.
 
 ### Defect H: Missing Clash Validation on Updates (`sessions.ts`)
 *   **Root Cause:** The `PATCH` route allowed updating session times or rooms without running overlap checks, bypassing schedule validation.
